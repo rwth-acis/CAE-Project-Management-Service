@@ -107,7 +107,7 @@ public class RESTResources {
 				return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).build();
 			} finally {
 				try {
-					connection.close();
+					if(connection != null) connection.close();
 				} catch (SQLException e) {
 					logger.printStackTrace(e);
 					return Response.serverError().entity("Internal server error.").build();
@@ -219,7 +219,11 @@ public class RESTResources {
 			user.persist(connection);
 			return user;
 		} finally {
-			connection.close();
+			try {
+			    connection.close();
+			} catch (SQLException e) {
+				logger.printStackTrace(e);
+			}
 		}
 	}
 }
