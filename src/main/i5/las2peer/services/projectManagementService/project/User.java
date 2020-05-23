@@ -116,5 +116,9 @@ public class User {
 
 		return jsonUser;
 	}
-
+	
+	public int getId() {
+		return this.id;
+	}
+	
 }
