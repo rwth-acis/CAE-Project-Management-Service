@@ -74,6 +74,31 @@ public class Project {
 		statement.close();
 	}
 	
+    /**
+     * Creates a new project by loading it from the database.
+     * @param projectId the id of the project that resides in the database
+     * @param connection a Connection Object
+     * @throws SQLException if the project is not found (ProjectNotFoundException) or something else went wrong
+     */
+	public Project(int projectId, Connection connection) throws SQLException {
+		this.id = projectId;
+		
+		// search for project with the given id
+	    PreparedStatement statement = connection.prepareStatement("SELECT * FROM Project WHERE id=?;");
+		statement.setInt(1, projectId);
+		// execute query
+	    ResultSet queryResult = statement.executeQuery();
+	    
+	    // check for results
+		if (queryResult.next()) {
+			this.name = queryResult.getString("name");
+		} else {
+			// there does not exist a project with the given id in the database
+			throw new ProjectNotFoundException();
+		}
+		statement.close();
+	}
+	
 	/**
 	 * Persists a project.
 	 * @param connection a Connection Object
@@ -172,7 +197,7 @@ public class Project {
 	 */
 	public boolean hasUser(int userId, Connection connection) throws SQLException {
 		// search for entry in ProjectToUser table
-	    PreparedStatement statement = connection.prepareStatement("SELECT * FROM ProjectToUser WHERE projectId=? AND userId=?;");
+	    PreparedStatement statement = connection.prepareStatement("SELECT * FROM ProjectToUser WHERE projectId = ? AND userId = ?;");
 	    statement.setInt(1, this.id);
 	    statement.setInt(2, userId);
 	    // execute query
@@ -180,5 +205,23 @@ public class Project {
 	    boolean exists = queryResult.next();
 	    statement.close();
 	    return exists;
+	}
+	
+	public static ArrayList<Project> getProjectsByUser(int userId, Connection connection) throws SQLException {
+		ArrayList<Project> projects = new ArrayList<>();
+		
+		// search for projects where user is part of
+		PreparedStatement statement = connection.prepareStatement("SELECT Project.id FROM Project, ProjectToUser WHERE Project.id = ProjectToUser.projectId AND ProjectToUser.userId = (?);");
+		statement.setInt(1, userId);
+		// execute query
+		ResultSet queryResult = statement.executeQuery();
+		
+		// add every project of the results to the list
+		while(queryResult.next()) {
+			projects.add(new Project(queryResult.getInt(1), connection));
+		}
+		
+	    statement.close();
+		return projects;
 	}
 }

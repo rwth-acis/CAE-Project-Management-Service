@@ -3,6 +3,7 @@ package i5.las2peer.services.projectManagementService;
 import java.net.HttpURLConnection;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.logging.Level;
 
 import javax.ws.rs.Consumes;
@@ -31,6 +32,7 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 
 import org.json.simple.JSONObject;
+import org.json.simple.JSONArray;
 import org.json.simple.parser.ParseException;
 
 /**
@@ -119,6 +121,13 @@ public class RESTResources {
 	
 	@GET
 	@Path("/projects")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Searches for the project that the user is part of.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, list of users projects is returned."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
 	public Response getProjectsByUser() {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProjectsByUser: searching for users projects");
 		
@@ -129,8 +138,37 @@ public class RESTResources {
 			UserAgent userAgent = (UserAgent) agent;
             String email = userAgent.getEmail();
             String loginName = userAgent.getLoginName();
+            
+            Connection connection = null;
+            try {
+            	// first get current user from database
+            	// the id of the user will be needed later
+            	User user = getUser(email, loginName);
+            	
+            	connection = dbm.getConnection();
+            	// get all projects where the user is part of
+            	ArrayList<Project> projects = Project.getProjectsByUser(user.getId(), connection);
+            	// create a JSONArray from the ArrayList
+            	JSONArray jsonProjects = new JSONArray();
+            	for(Project p : projects) {
+            		jsonProjects.add(p.toJSONObject());
+            	}
+            	
+            	// return JSONArray as string
+            	return Response.ok(jsonProjects.toJSONString()).build();
+            } catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
 		}
-		return Response.serverError().build();
+		return Response.serverError().entity("Internal server error.").build();
 	}
 	
 	// TODO: Javadoc
