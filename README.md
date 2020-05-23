@@ -23,6 +23,7 @@ docker run -e MYSQL_USER=myuser -e MYSQL_PASSWORD=mypasswd -p 8080:8080 -p 9011:
 Replace *myuser* and *mypasswd* with the username and password of a MySQL user with access to a database named *commedit*.
 By default the database host is *mysql* and the port is *3306*.
 You can use --link option to connect the project management service with the MySQL docker container.
+Note, when using MYSQL_HOST env variable, it seems to be needed to also give the MYSQL_PORT even if it should be the standard one.
 
 In order to customize your setup you can set further environment variables.
 
