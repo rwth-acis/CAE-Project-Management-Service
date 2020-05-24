@@ -7,6 +7,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
+import org.json.simple.parser.ParseException;
 
 import i5.las2peer.services.projectManagementService.exception.UserNotFoundException;
 
@@ -99,6 +101,30 @@ public class User {
 			throw new UserNotFoundException();
 		}
 		statement.close();
+	}
+	
+	/**
+	 * Searches for a user with the given loginName.
+	 * @param loginName Login name of the user to search for.
+	 * @param connection Connection object
+	 * @return User object
+	 * @throws SQLException If something with the database went wrong (or UserNotFoundException).
+	 */
+	public static User loadUserByLoginName(String loginName, Connection connection) throws SQLException {
+		PreparedStatement statement = connection.prepareStatement("SELECT * FROM User WHERE loginName=?;");
+		statement.setString(1, loginName);
+		// execute query
+		ResultSet queryResult = statement.executeQuery();
+		
+		// check for results
+		if(queryResult.next()) {
+		    String email = queryResult.getString("email");
+			statement.close();
+			return new User(email, connection);
+		} else {
+			statement.close();
+			throw new UserNotFoundException();
+		}
 	}
 	
 	/**

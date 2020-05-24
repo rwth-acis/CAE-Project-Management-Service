@@ -237,9 +237,6 @@ public class Project {
 		statement.executeUpdate();
 		statement.close();
 		
-		// commit changes
-		connection.commit();
-		
 		return true;
 	}
 	

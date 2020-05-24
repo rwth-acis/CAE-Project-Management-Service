@@ -4,6 +4,7 @@ import java.net.HttpURLConnection;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.logging.Level;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -35,6 +36,8 @@ import io.swagger.annotations.Info;
 import io.swagger.annotations.License;
 import io.swagger.annotations.SwaggerDefinition;
 
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
 /**
@@ -224,6 +227,107 @@ public class RESTResources {
 				logger.printStackTrace(e);
 			}
 		}
+	}
+	
+	/**
+	 * Adds a user to a project.
+	 * Therefore, the user sending the request needs to be authorized in order
+	 * to check if the user is a member of the project, because only project members 
+	 * should be allowed to add users to it.
+	 * @param projectId Id of the project where the user should be added to.
+	 * @param inputUser JSON object containing a "loginName" attribute with the name of the user to add.
+	 * @return Response with status code (and possibly an error description).
+	 */
+	@POST
+	@Path("/projects/{id}/users")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Adds a user to the project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, added user to project. Also returns JSON of user which got added."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to add users to it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or user to add to project could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Input user is not well formatted."),
+			@ApiResponse(code = HttpURLConnection.HTTP_CONFLICT, message = "The user is already member of the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response addUserToProject(@PathParam("id") int projectId, String inputUser) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "addUserToProject: adding user to project with id " + projectId);
+        Agent agent = Context.getCurrent().getMainAgent();
+		
+		if (agent instanceof AnonymousAgent) {
+            return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+        } else if (agent instanceof UserAgent) {
+        	UserAgent userAgent = (UserAgent) agent;
+            String email = userAgent.getEmail();
+            String loginName = userAgent.getLoginName();
+            
+            User user;
+			try {
+				user = getUser(email, loginName);
+				
+				// check if user is allowed to add a user to the project
+				Connection connection = null;
+				try {
+				    connection = dbm.getConnection();
+				    
+				    // get project by id (load it from database)
+				    Project project = new Project(projectId, connection);
+				    
+				    if(project.hasUser(user.getId(), connection)) {
+				    	// user is part of the project and thus is allowed to add new users
+				    	// extract name of the user given in the request body (as json)
+				    	JSONObject jsonUserToAdd = (JSONObject) JSONValue.parseWithException(inputUser);
+				    	    
+				    	if(jsonUserToAdd.containsKey("loginName")) {
+				    	    String userToAddLoginName = (String) jsonUserToAdd.get("loginName");
+				    	    	
+				    	    User userToAdd = User.loadUserByLoginName(userToAddLoginName, connection);
+				    	    boolean added = project.addUser(userToAdd.getId(), connection);
+				    	    if(added) {
+				    	        // return result: ok
+				    	        return Response.ok(userToAdd.toJSONObject().toJSONString()).build();
+				    	    } else {
+				    	    	// user is already a member of the project
+				    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
+				    	    			.entity("User is already member of the project.").build();
+				    	    }
+				    	} else {
+				    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+				    	            .entity("Input user does not contains key 'loginName' which is needed.").build();
+				    	}
+				    } else {
+				    	// user does not have the permission to add users to the project
+				    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+				    			.entity("User needs to be member of the project to add a user to it.").build();
+				    }
+				    
+				} catch (UserNotFoundException e) {
+					return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+							.entity("User with the given login name could not be found.").build();
+				} catch (ProjectNotFoundException e) {
+					return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+							.entity("Project with the given id could not be found.").build();
+				} catch (SQLException e) {
+	            	logger.printStackTrace(e);
+	            	return Response.serverError().entity("Internal server error.").build();
+	            } catch (ParseException p) {
+		    		logger.printStackTrace(p);
+		    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
+		    	} finally {
+					try {
+						if(connection != null) connection.close();
+					} catch (SQLException e) {
+						logger.printStackTrace(e);
+						return Response.serverError().entity("Internal server error.").build();
+					}
+				}
+			} catch (SQLException e) {
+				logger.printStackTrace(e);
+				// return server error at the end
+			}
+        }
+		return Response.serverError().entity("Internal server error.").build();
 	}
 	
 	
