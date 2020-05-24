@@ -4,7 +4,6 @@ import java.net.HttpURLConnection;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.logging.Level;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -27,12 +26,15 @@ import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundEx
 import i5.las2peer.services.projectManagementService.exception.UserNotFoundException;
 import i5.las2peer.services.projectManagementService.project.Project;
 import i5.las2peer.services.projectManagementService.project.User;
+import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import io.swagger.annotations.Contact;
+import io.swagger.annotations.Info;
+import io.swagger.annotations.License;
+import io.swagger.annotations.SwaggerDefinition;
 
-import org.json.simple.JSONObject;
-import org.json.simple.JSONArray;
 import org.json.simple.parser.ParseException;
 
 /**
@@ -40,6 +42,21 @@ import org.json.simple.parser.ParseException;
  * @author Philipp
  *
  */
+// TODO: adjust license
+@Api
+@SwaggerDefinition(
+		info = @Info(
+				title = "CAE Project Management Service",
+				version = "0.1.0",
+				description = "A las2peer service used for project management in the CAE, i.e. creating/editing projects, managing project components and users.",
+				termsOfService = "none",
+				contact = @Contact(
+						name = "Philipp D",
+						url = "https://github.com/phil-cd",
+						email = "-"),
+				license = @License(
+						name = "your software license name",
+						url = "http://your-software-license-url.com")))
 @Path("/")
 public class RESTResources {
 	
