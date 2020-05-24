@@ -86,7 +86,7 @@ public class RESTResources {
             try {
 				User user = getUser(email, loginName);
 				
-				Project project = new Project(inputProject);
+				Project project = new Project(user, inputProject);
 				
 				// check if a project with the given name already exists
 			    connection = dbm.getConnection();
@@ -96,9 +96,9 @@ public class RESTResources {
 				    return Response.status(HttpURLConnection.HTTP_CONFLICT).entity("A project with the given name already exists.").build();
 			    } catch (ProjectNotFoundException e) {
 			    	// project does not exist yet
+			    	// persist method also stores users of the project (only the creator for now) etc.
 			    	project.persist(connection);
-			    	// add current user to the project
-			    	project.addUser(user.getId(), connection);
+			    	
 					return Response.status(HttpURLConnection.HTTP_CREATED).entity(project.toJSONObject().toJSONString()).build();
 			    }
 			} catch (SQLException e) {

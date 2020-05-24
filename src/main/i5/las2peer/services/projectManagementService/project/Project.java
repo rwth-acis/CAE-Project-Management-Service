@@ -33,6 +33,11 @@ public class Project {
     private String name;
     
     /**
+     * Users that are part of the project.
+     */
+    private ArrayList<User> users;
+    
+    /**
      * Roles that belong to the project.
      */
     private ArrayList<Role> roles;
@@ -41,23 +46,28 @@ public class Project {
      * Creates a project object from the given JSON string.
      * This constructor should be used before storing new projects.
      * Therefore, no project id need to be included in the JSON string yet.
+     * @param creator User that creates the project.
      * @param jsonProject JSON representation of the project to store.
      * @throws ParseException If parsing went wrong.
      */
-    public Project(String jsonProject) throws ParseException {
+    public Project(User creator, String jsonProject) throws ParseException {
     	JSONObject project = (JSONObject) JSONValue.parseWithException(jsonProject);
     	this.name = (String) project.get("name");
+    	
+    	// only add the creator as user
+    	// do not call addUser() method here, because the entry in ProjectToUser table should
+    	// not be created now (will be done when calling persist() method)
+    	this.users = new ArrayList<>();
+    	this.users.add(creator);
     }
     
     /**
-     * Creates a new project by loading it from the database.
+     * Creates a new project object by loading it from the database.
      * @param projectName the name of the project that resides in the database
      * @param connection a Connection Object
      * @throws SQLException if the project is not found (ProjectNotFoundException) or something else went wrong
      */
 	public Project(String projectName, Connection connection) throws SQLException {
-		this.name = projectName;
-		
 		// search for project with the given name
 	    PreparedStatement statement = connection.prepareStatement("SELECT * FROM Project WHERE name=?;");
 		statement.setString(1, projectName);
@@ -66,7 +76,8 @@ public class Project {
 	    
 	    // check for results
 		if (queryResult.next()) {
-			this.id = queryResult.getInt(1);
+			// call helper method for setting all the attributes
+			setAttributesFromQueryResult(queryResult, connection);
 		} else {
 			// there does not exist a project with the given name in the database
 			throw new ProjectNotFoundException();
@@ -74,15 +85,13 @@ public class Project {
 		statement.close();
 	}
 	
-    /**
+	/**
      * Creates a new project by loading it from the database.
      * @param projectId the id of the project that resides in the database
      * @param connection a Connection Object
      * @throws SQLException if the project is not found (ProjectNotFoundException) or something else went wrong
      */
 	public Project(int projectId, Connection connection) throws SQLException {
-		this.id = projectId;
-		
 		// search for project with the given id
 	    PreparedStatement statement = connection.prepareStatement("SELECT * FROM Project WHERE id=?;");
 		statement.setInt(1, projectId);
@@ -91,11 +100,41 @@ public class Project {
 	    
 	    // check for results
 		if (queryResult.next()) {
-			this.name = queryResult.getString("name");
+			setAttributesFromQueryResult(queryResult, connection);
 		} else {
 			// there does not exist a project with the given id in the database
 			throw new ProjectNotFoundException();
 		}
+		statement.close();
+	}
+	
+	/**
+	 * Gets used by the constructors that load a project from the database.
+	 * @param queryResult Should contain all columns and next() should have been called already.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	private void setAttributesFromQueryResult(ResultSet queryResult, Connection connection) throws SQLException {
+		this.id = queryResult.getInt("id");
+		this.name = queryResult.getString("name");
+		
+		// load users
+	    loadUsers(connection);
+	}
+	
+	private void loadUsers(Connection connection) throws SQLException {
+		this.users = new ArrayList<>();
+		
+		PreparedStatement statement = connection.prepareStatement("SELECT User.email FROM ProjectToUser, User WHERE ProjectToUser.userId = User.id AND ProjectToUser.projectId = ?;");
+		statement.setInt(1, this.id);
+		// execute query
+		ResultSet queryResult = statement.executeQuery();
+		
+		while(queryResult.next()) {
+			String email = queryResult.getString("email");
+			this.users.add(new User(email, connection));
+		}
+		
 		statement.close();
 	}
 	
@@ -121,12 +160,21 @@ public class Project {
 			this.id = genKeys.getInt(1);
 			statement.close();
 			
+			// store users
+			persistUsers(connection);
+			
 			// no errors occurred, so commit
 			connection.commit();
 		} catch (SQLException e) {
 			// roll back the whole stuff
 			connection.rollback();
 			throw e;
+		}
+	}
+	
+	private void persistUsers(Connection connection) throws SQLException {
+		for(User user : this.users) {
+			addUser(user.getId(), connection);
 		}
 	}
 	
@@ -159,6 +207,13 @@ public class Project {
 		// put attributes
 		jsonProject.put("id", this.id);
 		jsonProject.put("name", this.name);
+		
+		// put users
+		JSONArray jsonUsers = new JSONArray();
+		for(User user : users) {
+			jsonUsers.add(user.toJSONObject());
+		}
+		jsonProject.put("users", jsonUsers);
 
 		return jsonProject;
 	}
