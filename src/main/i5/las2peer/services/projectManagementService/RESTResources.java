@@ -58,7 +58,7 @@ public class RESTResources {
 	 * First, checks if a project with the given name already exists.
 	 * If not, then the new project gets stored into the database.
 	 * @param inputProject JSON representation of the project to store.
-	 * @return Response containing the status code (and a message).
+	 * @return Response containing the status code (and a message or the created project).
 	 */
 	@POST
 	@Path("/projects")
@@ -119,6 +119,11 @@ public class RESTResources {
 		return Response.serverError().entity("Internal server error.").build();
 	}
 	
+	/**
+	 * Searches for the project that the user is part of.
+	 * Therefore, the user needs to be authorized.
+	 * @return Response containing the status code (and a message or project list).
+	 */
 	@GET
 	@Path("/projects")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -148,14 +153,9 @@ public class RESTResources {
             	connection = dbm.getConnection();
             	// get all projects where the user is part of
             	ArrayList<Project> projects = Project.getProjectsByUser(user.getId(), connection);
-            	// create a JSONArray from the ArrayList
-            	JSONArray jsonProjects = new JSONArray();
-            	for(Project p : projects) {
-            		jsonProjects.add(p.toJSONObject());
-            	}
             	
             	// return JSONArray as string
-            	return Response.ok(jsonProjects.toJSONString()).build();
+            	return Response.ok(Project.projectListToJSONArray(projects).toJSONString()).build();
             } catch (SQLException e) {
             	logger.printStackTrace(e);
             	return Response.serverError().entity("Internal server error.").build();
@@ -171,19 +171,42 @@ public class RESTResources {
 		return Response.serverError().entity("Internal server error.").build();
 	}
 	
-	// TODO: Javadoc
+	/**
+	 * Searches for projects in the database.
+	 * Therefore, no authorization is needed.
+	 * @param projectName Project name to search for.
+	 * @return Response containing the status code (and a message or project list).
+	 */
 	@GET
 	@Path("/projects/{projectName}")
 	@Produces(MediaType.APPLICATION_JSON)
-	@ApiOperation(value = "Searches for a project in the database.")
+	@ApiOperation(value = "Searches for projects in the database.")
 	@ApiResponses(value = {
-			@ApiResponse(code = HttpURLConnection.HTTP_OK, message="Found project with the given name."),
-			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message="Project with the given name could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message="Found project(s) with the given name."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
-	public Response getProject(@PathParam("projectName") String projectName) {
-		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProject: searching project with name " + projectName);
-		return Response.status(HttpURLConnection.HTTP_NOT_FOUND).entity("Project not found.").build();
+	public Response searchProjects(@PathParam("projectName") String projectName) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProject: searching project(s) with name " + projectName);
+		
+		Connection connection = null;
+		try {
+			connection = dbm.getConnection();
+			
+			// search for projects
+			ArrayList<Project> projects = Project.searchProjects(projectName, connection);
+			
+			// return JSONArray as string
+        	return Response.ok(Project.projectListToJSONArray(projects).toJSONString()).build();
+		} catch (SQLException e) {
+			logger.printStackTrace(e);
+			return Response.serverError().entity("Internal server error.").build();
+		} finally {
+			try {
+			    connection.close();
+			} catch (SQLException e) {
+				logger.printStackTrace(e);
+			}
+		}
 	}
 	
 	

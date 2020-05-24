@@ -207,21 +207,68 @@ public class Project {
 	    return exists;
 	}
 	
-	public static ArrayList<Project> getProjectsByUser(int userId, Connection connection) throws SQLException {
+	/**
+	 * Queries the database by using the given statement (which needs to fulfill some requirements, see below).
+	 * @param statement IMPORTANT: this must already have all parameters set and the query needs to select the project id.
+	 * @param connection Connection object
+	 * @return ArrayList of projects resulted by the query.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	private static ArrayList<Project> queryProjects(PreparedStatement statement, Connection connection) throws SQLException {
 		ArrayList<Project> projects = new ArrayList<>();
 		
+		// execute query
+		ResultSet queryResult = statement.executeQuery();
+				
+		// add every project of the results to the list
+		while(queryResult.next()) {
+			projects.add(new Project(queryResult.getInt("id"), connection));
+		}
+				
+	    statement.close();
+	    return projects;
+	}
+	
+	/**
+	 * Searches for projects where the user with the given id is part of.
+	 * @param userId Id of the user to search the projects for.
+	 * @param connection Connection object
+	 * @return Empty ArrayList when no project was found. Otherwise it contains the projects that the user is part of.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public static ArrayList<Project> getProjectsByUser(int userId, Connection connection) throws SQLException {
 		// search for projects where user is part of
 		PreparedStatement statement = connection.prepareStatement("SELECT Project.id FROM Project, ProjectToUser WHERE Project.id = ProjectToUser.projectId AND ProjectToUser.userId = (?);");
 		statement.setInt(1, userId);
-		// execute query
-		ResultSet queryResult = statement.executeQuery();
 		
-		// add every project of the results to the list
-		while(queryResult.next()) {
-			projects.add(new Project(queryResult.getInt(1), connection));
-		}
+		return queryProjects(statement, connection);
+	}
+	
+	/**
+	 * Searches for projects where the name is like the search input given.
+	 * @param searchInput Search input / name of the project to search for.
+	 * @param connection Connection object
+	 * @return ArrayList of projects containing the search results.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public static ArrayList<Project> searchProjects(String searchInput, Connection connection) throws SQLException {
+		// search for projects where the name is like the searchInput given
+		PreparedStatement statement = connection.prepareStatement("SELECT Project.id FROM Project WHERE name LIKE ?;");
+		statement.setString(1, "%" + searchInput + "%");
 		
-	    statement.close();
-		return projects;
+		return queryProjects(statement, connection);
+	}
+	
+	/**
+	 * Creates a JSONArray containing the projects from the given list as JSONObjects.
+	 * @param projects ArrayList with Project objects
+	 * @return JSONArray containing the projects given as JSONObjects.
+	 */
+	public static JSONArray projectListToJSONArray(ArrayList<Project> projects) {
+		JSONArray jsonProjects = new JSONArray();
+    	for(Project p : projects) {
+    		jsonProjects.add(p.toJSONObject());
+    	}
+    	return jsonProjects;
 	}
 }
