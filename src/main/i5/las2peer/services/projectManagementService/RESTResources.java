@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.logging.Level;
 
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -330,6 +331,101 @@ public class RESTResources {
 		return Response.serverError().entity("Internal server error.").build();
 	}
 	
+	/**
+	 * Removes a user from a project.
+	 * Therefore, the user sending the request needs to be authorized in order
+	 * to check if the user is a member of the project, because only project members 
+	 * should be allowed to remove users from it.
+	 * @param projectId Id of the project where the user should be removed from.
+	 * @param inputUser JSON object containing an "id" attribute with the id of the user to remove.
+	 * @return Response with status code (and possibly an error description).
+	 */
+	@DELETE
+	@Path("/projects/{id}/users")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Removes a user from the project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, removed user from project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to remove users from it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or user to remove from project could not be found or user to remove is no member of the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Input user is not well formatted."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response removeUserFromProject(@PathParam("id") int projectId, String inputUser) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "removeUserFromProject: removing user from project with id " + projectId);
+        Agent agent = Context.getCurrent().getMainAgent();
+		
+		if (agent instanceof AnonymousAgent) {
+            return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+        } else if (agent instanceof UserAgent) {
+        	UserAgent userAgent = (UserAgent) agent;
+            String email = userAgent.getEmail();
+            String loginName = userAgent.getLoginName();
+            
+            User user;
+			try {
+				user = getUser(email, loginName);
+				
+				// check if user is allowed to remove a user from the project
+				Connection connection = null;
+				try {
+				    connection = dbm.getConnection();
+				    
+				    // get project by id (load it from database)
+				    Project project = new Project(projectId, connection);
+				    
+				    if(project.hasUser(user.getId(), connection)) {
+				    	// user is part of the project and thus is allowed to remove users
+				    	// extract id of the user given in the request body (as json)
+				    	JSONObject jsonUserToRemove = (JSONObject) JSONValue.parseWithException(inputUser);
+				    	    
+				    	if(jsonUserToRemove.containsKey("id")) {
+				    	    int userToRemoveId = ((Long) jsonUserToRemove.get("id")).intValue();
+				    	    	
+				    	    boolean removed = project.removeUser(userToRemoveId, connection);
+				    	    if(removed) {
+				    	        // return result: ok
+				    	        return Response.ok().build();
+				    	    } else {
+				    	    	// user is no member of the project
+				    	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+				    	    			.entity("User is no member of the project.").build();
+				    	    }
+				    	} else {
+				    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+				    	            .entity("Input user does not contains key 'id' which is needed.").build();
+				    	}
+				    } else {
+				    	// user does not have the permission to remove users from the project
+				    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+				    			.entity("User needs to be member of the project to remove a user from it.").build();
+				    }
+				    
+				} catch (ProjectNotFoundException e) {
+					return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+							.entity("Project with the given id could not be found.").build();
+				} catch (SQLException e) {
+	            	logger.printStackTrace(e);
+	            	return Response.serverError().entity("Internal server error.").build();
+	            } catch (ParseException p) {
+		    		logger.printStackTrace(p);
+		    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
+		    	} finally {
+					try {
+						if(connection != null) connection.close();
+					} catch (SQLException e) {
+						logger.printStackTrace(e);
+						return Response.serverError().entity("Internal server error.").build();
+					}
+				}
+			} catch (SQLException e) {
+				logger.printStackTrace(e);
+				// return server error at the end
+			}
+        }
+		return Response.serverError().entity("Internal server error.").build();
+	}
 	
 	
 	/**

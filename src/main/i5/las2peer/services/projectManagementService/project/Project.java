@@ -241,6 +241,28 @@ public class Project {
 	}
 	
 	/**
+	 * Removes the user with the given id from the project.
+	 * @param userId Id of the user to remove.
+	 * @param connection Connection object
+	 * @return False, if user cannot be removed because he is no member of the project. True, if removed successfully.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public boolean removeUser(int userId, Connection connection) throws SQLException {
+		// first check if user is part of the project
+		if(!hasUser(userId, connection)) return false;
+		
+		// user is member of the project, so remove user
+		PreparedStatement statement = connection.prepareStatement("DELETE FROM ProjectToUser WHERE projectId = ? and userId = ?;");
+		statement.setInt(1, this.id);
+		statement.setInt(2, userId);
+		// execute update
+		statement.executeUpdate();
+		statement.close();
+		
+		return true;
+	}
+	
+	/**
 	 * Checks if the current project has a user with the given id.
 	 * @param userId Id of the user to search for.
 	 * @param connection Connection object
