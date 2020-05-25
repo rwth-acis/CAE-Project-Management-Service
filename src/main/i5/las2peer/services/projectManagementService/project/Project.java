@@ -14,6 +14,7 @@ import org.json.simple.parser.ParseException;
 
 import i5.las2peer.services.projectManagementService.exception.NoDefaultRoleFoundException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
+import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
 
 /**
  * (Data-)Class for Projects. Provides means to convert JSON to Object and Object
@@ -259,6 +260,70 @@ public class Project {
 		jsonProject.put("users", jsonUsers);
 
 		return jsonProject;
+	}
+	
+	/**
+	 * Adds the given role to the current project.
+	 * @param role Role to add.
+	 * @param connection Connection object
+	 * @return False, if a role with the same name already exists in the project. True, if role got added.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public boolean addRole(Role role, Connection connection) throws SQLException {
+		// check if role with the name already exists
+		if(hasRole(role.getName())) return false;
+		
+		// role with the same name does not exist for the project
+		// add role to project now
+		role.persist(connection);
+		
+		return true;
+	}
+	
+	public boolean hasRole(String name) {
+		for(Role r : this.roles) {
+			if(r.getName().equals(name)) return true;
+		}
+		return false;
+	}
+	
+	public boolean hasRole(int roleId) {
+		for(Role r : this.roles) {
+			if(r.getId() == roleId) return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * Removes the role with the given id from the project.
+	 * @param roleId Id of the role to remove.
+	 * @param connection Connection object
+	 * @return False, if role cannot be removed because it is assigned to at least one user. True, if removed successfully.
+	 * @throws SQLException If something with the database went wrong (RoleNotFoundException when role does not exist in project).
+	 */
+	public boolean removeRole(int roleId, Connection connection) throws SQLException {
+		// first check if role is part of the project
+		if(!hasRole(roleId)) throw new RoleNotFoundException();
+		
+		// check if role is assigned to at least one user, because then it should not be removed
+		PreparedStatement statement = connection.prepareStatement("SELECT * FROM UserToRole WHERE roleId = ?;");
+		statement.setInt(1, roleId);
+		// execute query
+		statement.executeQuery();
+		
+		ResultSet queryResult = statement.executeQuery();
+		if(queryResult.next()) return false; // at least one user has assigned this role, dont remove it
+		statement.close();
+		
+		// no user has assigned the role, delete it now
+		// remove role
+		statement = connection.prepareStatement("DELETE FROM Role WHERE id = ?;");
+		statement.setInt(1, roleId);
+		// execute update
+		statement.executeUpdate();
+		statement.close();
+		
+		return true;
 	}
 	
 	/**

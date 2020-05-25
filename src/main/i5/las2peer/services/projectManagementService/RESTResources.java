@@ -26,8 +26,10 @@ import i5.las2peer.logging.L2pLogger;
 import i5.las2peer.services.projectManagementService.auth.AuthManager;
 import i5.las2peer.services.projectManagementService.database.DatabaseManager;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
+import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.UserNotFoundException;
 import i5.las2peer.services.projectManagementService.project.Project;
+import i5.las2peer.services.projectManagementService.project.Role;
 import i5.las2peer.services.projectManagementService.project.User;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -337,70 +339,236 @@ public class RESTResources {
 		if(authManager.isAnonymous()) {
 			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
 		} else {
+			// check if user is allowed to remove a user from the project
+			Connection connection = null;
 			try {
-				User user = authManager.getUser();
-				
-				// check if user is allowed to remove a user from the project
-				Connection connection = null;
-				try {
-				    connection = dbm.getConnection();
-				    
-				    // get project by id (load it from database)
-				    Project project = new Project(projectId, connection);
-				    
-				    if(project.hasUser(user.getId(), connection)) {
-				    	// user is part of the project and thus is allowed to remove users
-				    	// extract id of the user given in the request body (as json)
-				    	JSONObject jsonUserToRemove = (JSONObject) JSONValue.parseWithException(inputUser);
-				    	    
-				    	if(jsonUserToRemove.containsKey("id")) {
-				    	    int userToRemoveId = ((Long) jsonUserToRemove.get("id")).intValue();
-				    	    	
-				    	    boolean removed = project.removeUser(userToRemoveId, connection);
-				    	    if(removed) {
-				    	        // return result: ok
-				    	        return Response.ok().build();
-				    	    } else {
-				    	    	// user is no member of the project
-				    	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
-				    	    			.entity("User is no member of the project.").build();
-				    	    }
-				    	} else {
-				    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
-				    	            .entity("Input user does not contains key 'id' which is needed.").build();
-				    	}
-				    } else {
-				    	// user does not have the permission to remove users from the project
-				    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
-				    			.entity("User needs to be member of the project to remove a user from it.").build();
-				    }
-				    
-				} catch (ProjectNotFoundException e) {
-					return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
-							.entity("Project with the given id could not be found.").build();
-				} catch (SQLException e) {
-	            	logger.printStackTrace(e);
-	            	return Response.serverError().entity("Internal server error.").build();
-	            } catch (ParseException p) {
-		    		logger.printStackTrace(p);
-		    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
-		    	} finally {
-					try {
-						if(connection != null) connection.close();
-					} catch (SQLException e) {
-						logger.printStackTrace(e);
-						return Response.serverError().entity("Internal server error.").build();
-					}
-				}
+			    connection = dbm.getConnection();
+			    
+			    User user = authManager.getUser();
+			    
+			    // get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is part of the project and thus is allowed to remove users
+			    	// extract id of the user given in the request body (as json)
+			    	JSONObject jsonUserToRemove = (JSONObject) JSONValue.parseWithException(inputUser);
+			    	    
+			    	if(jsonUserToRemove.containsKey("id")) {
+			    	    int userToRemoveId = ((Long) jsonUserToRemove.get("id")).intValue();
+			    	    	
+			    	    boolean removed = project.removeUser(userToRemoveId, connection);
+			    	    if(removed) {
+			    	        // return result: ok
+			    	        return Response.ok().build();
+			    	    } else {
+			    	    	// user is no member of the project
+			    	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+			    	    			.entity("User is no member of the project.").build();
+			    	    }
+			    	} else {
+			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+			    	            .entity("Input user does not contains key 'id' which is needed.").build();
+			    	}
+			    } else {
+			    	// user does not have the permission to remove users from the project
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to remove a user from it.").build();
+			    }
+			    
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
 			} catch (SQLException e) {
-				logger.printStackTrace(e);
-				// return server error at the end
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } catch (ParseException p) {
+	    		logger.printStackTrace(p);
+	    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
+	    	} finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
 			}
 		}
-		
-		return Response.serverError().entity("Internal server error.").build();
 	}
 	
+	/**
+	 * Adds a role to a project.
+	 * Therefore, the user sending the request needs to be authorized in order
+	 * to check if the user is a member of the project, because only project members 
+	 * should be allowed to add roles to it.
+	 * @param projectId Id of the project where the role should be added to.
+	 * @param inputRole JSON object containing a "name" attribute with the name of the role to add.
+	 * @return Response with status code (and possibly an error description).
+	 */
+	@POST
+	@Path("/projects/{id}/roles")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Adds a role to the project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, added role to project. Also returns JSON of role which got added."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to add roles to it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Input role is not well formatted."),
+			@ApiResponse(code = HttpURLConnection.HTTP_CONFLICT, message = "The project already contains a role with the same name."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response postProjectRole(@PathParam("id") int projectId, String inputRole) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "postProjectRole: trying to store a new role to a project");
+		
+		if (authManager.isAnonymous()) {
+            return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+        } else {
+            // check if user is allowed to add a role to the project
+			Connection connection = null;
+			try {
+			    connection = dbm.getConnection();
+			    
+			    User user = authManager.getUser();
+			    
+			    // get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is part of the project and thus is allowed to add new roles
+			    	// extract name of the role given in the request body (as json)
+			    	JSONObject jsonRoleToAdd = (JSONObject) JSONValue.parseWithException(inputRole);
+			    	    
+			    	if(jsonRoleToAdd.containsKey("name")) {
+			    	    String roleToAddName = (String) jsonRoleToAdd.get("name");
+			    	    
+			    	    Role role = new Role(project.getId(), roleToAddName, false); // role should not be the default role
+			    	    boolean added = project.addRole(role, connection);
+			    	    if(added) {
+			    	        // return result: ok
+			    	        return Response.ok(role.toJSONObject().toJSONString()).build();
+			    	    } else {
+			    	    	// role with the same name already exists in the project
+			    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
+			    	    			.entity("Role with the same name already exists in the project.").build();
+			    	    }
+			    	} else {
+			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+			    	            .entity("Input user does not contains key 'name' which is needed.").build();
+			    	}
+			    } else {
+			    	// user does not have the permission to add roles to the project
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to add a role to it.").build();
+			    }
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } catch (ParseException p) {
+	    		logger.printStackTrace(p);
+	    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
+	    	} finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+        }
+	}
+	
+	/**
+	 * Removes a role from a project.
+	 * Therefore, the user sending the request needs to be authorized in order
+	 * to check if the user is a member of the project, because only project members 
+	 * should be allowed to remove roles from it.
+	 * @param projectId Id of the project where the role should be removed from.
+	 * @param inputUser JSON object containing an "id" attribute with the id of the role to remove.
+	 * @return Response with status code (and possibly an error description).
+	 */
+	@DELETE
+	@Path("/projects/{id}/roles")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Removes a role from the project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, removed role from project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to remove roles from it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or role to remove from project could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Input role is not well formatted."),
+			@ApiResponse(code = HttpURLConnection.HTTP_CONFLICT, message = "The role is assigned to at least one user and thus cannot be removed."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response removeRoleFromProject(@PathParam("id") int projectId, String inputRole) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "removeRoleFromProject: removing role from project with id " + projectId);
+
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			// check if user is allowed to remove a role from the project
+			Connection connection = null;
+			try {
+			    connection = dbm.getConnection();
+			    
+			    User user = authManager.getUser();
+			    
+			    // get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is part of the project and thus is allowed to remove roles
+			    	// extract id of the role given in the request body (as json)
+			    	JSONObject jsonRoleToRemove = (JSONObject) JSONValue.parseWithException(inputRole);
+			    	    
+			    	if(jsonRoleToRemove.containsKey("id")) {
+			    	    int roleToRemoveId = ((Long) jsonRoleToRemove.get("id")).intValue();
+			    	    	
+			    	    boolean removed = project.removeRole(roleToRemoveId, connection);
+			    	    if(removed) {
+			    	        // return result: ok
+			    	        return Response.ok().build();
+			    	    } else {
+			    	    	// role could not be removed because it is still assigned to at least one user
+			    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
+			    	    			.entity("The role is assigned to at least one user and thus cannot be removed.").build();
+			    	    }
+			    	} else {
+			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+			    	            .entity("Input role does not contains key 'id' which is needed.").build();
+			    	}
+			    } else {
+			    	// user does not have the permission to remove roles from the project
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to remove a role from it.").build();
+			    }
+			    
+			} catch (RoleNotFoundException e) {
+				// role was not included in the project
+    	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+    	    			.entity("Project contains no role with the given id.").build();
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } catch (ParseException p) {
+	    		logger.printStackTrace(p);
+	    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
+	    	} finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
 	
 	/**
 	 * Method for retrieving the currently active user.
