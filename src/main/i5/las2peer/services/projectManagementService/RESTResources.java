@@ -23,6 +23,7 @@ import i5.las2peer.api.security.Agent;
 import i5.las2peer.api.security.AnonymousAgent;
 import i5.las2peer.api.security.UserAgent;
 import i5.las2peer.logging.L2pLogger;
+import i5.las2peer.services.projectManagementService.auth.AuthManager;
 import i5.las2peer.services.projectManagementService.database.DatabaseManager;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.UserNotFoundException;
@@ -67,10 +68,12 @@ public class RESTResources {
 	private final ProjectManagementService service = (ProjectManagementService) Context.getCurrent().getService();
 	private L2pLogger logger;
 	private DatabaseManager dbm;
+	private AuthManager authManager;
 
 	public RESTResources() throws ServiceException {
 		this.logger = (L2pLogger) service.getLogger();
 		this.dbm = service.getDbm();
+		this.authManager = new AuthManager(this.logger, this.dbm);
 	}
 	
 	/**
@@ -95,17 +98,12 @@ public class RESTResources {
 	public Response postProject(String inputProject) {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "postProject: trying to store a new project");
 		
-		Agent agent = Context.getCurrent().getMainAgent();
-		if(agent instanceof AnonymousAgent) {
+		if(authManager.isAnonymous()) {
 			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).entity("User not authorized.").build();
-		} else if(agent instanceof UserAgent) {
-			UserAgent userAgent = (UserAgent) agent;
-            String email = userAgent.getEmail();
-            String loginName = userAgent.getLoginName();
-            
-            Connection connection = null;
+		} else {
+			Connection connection = null;
             try {
-				User user = getUser(email, loginName);
+				User user = authManager.getUser();
 				
 				Project project = new Project(user, inputProject);
 				
@@ -137,7 +135,6 @@ public class RESTResources {
 				}
 			}
 		}
-		return Response.serverError().entity("Internal server error.").build();
 	}
 	
 	/**
@@ -157,19 +154,14 @@ public class RESTResources {
 	public Response getProjectsByUser() {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProjectsByUser: searching for users projects");
 		
-		Agent agent = Context.getCurrent().getMainAgent();
-		if(agent instanceof AnonymousAgent) {
+		if(authManager.isAnonymous()) {
 			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).entity("User not authorized.").build();
-		} else if(agent instanceof UserAgent) {
-			UserAgent userAgent = (UserAgent) agent;
-            String email = userAgent.getEmail();
-            String loginName = userAgent.getLoginName();
-            
-            Connection connection = null;
+		} else {
+			Connection connection = null;
             try {
             	// first get current user from database
             	// the id of the user will be needed later
-            	User user = getUser(email, loginName);
+            	User user = authManager.getUser();
             	
             	connection = dbm.getConnection();
             	// get all projects where the user is part of
@@ -189,7 +181,6 @@ public class RESTResources {
 				}
 			}
 		}
-		return Response.serverError().entity("Internal server error.").build();
 	}
 	
 	/**
@@ -254,81 +245,69 @@ public class RESTResources {
 	})
 	public Response addUserToProject(@PathParam("id") int projectId, String inputUser) {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "addUserToProject: adding user to project with id " + projectId);
-        Agent agent = Context.getCurrent().getMainAgent();
 		
-		if (agent instanceof AnonymousAgent) {
+		if (authManager.isAnonymous()) {
             return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
-        } else if (agent instanceof UserAgent) {
-        	UserAgent userAgent = (UserAgent) agent;
-            String email = userAgent.getEmail();
-            String loginName = userAgent.getLoginName();
-            
-            User user;
+        } else {
+            // check if user is allowed to add a user to the project
+			Connection connection = null;
 			try {
-				user = getUser(email, loginName);
-				
-				// check if user is allowed to add a user to the project
-				Connection connection = null;
-				try {
-				    connection = dbm.getConnection();
-				    
-				    // get project by id (load it from database)
-				    Project project = new Project(projectId, connection);
-				    
-				    if(project.hasUser(user.getId(), connection)) {
-				    	// user is part of the project and thus is allowed to add new users
-				    	// extract name of the user given in the request body (as json)
-				    	JSONObject jsonUserToAdd = (JSONObject) JSONValue.parseWithException(inputUser);
-				    	    
-				    	if(jsonUserToAdd.containsKey("loginName")) {
-				    	    String userToAddLoginName = (String) jsonUserToAdd.get("loginName");
-				    	    	
-				    	    User userToAdd = User.loadUserByLoginName(userToAddLoginName, connection);
-				    	    boolean added = project.addUser(userToAdd.getId(), connection);
-				    	    if(added) {
-				    	        // return result: ok
-				    	        return Response.ok(userToAdd.toJSONObject().toJSONString()).build();
-				    	    } else {
-				    	    	// user is already a member of the project
-				    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
-				    	    			.entity("User is already member of the project.").build();
-				    	    }
-				    	} else {
-				    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
-				    	            .entity("Input user does not contains key 'loginName' which is needed.").build();
-				    	}
-				    } else {
-				    	// user does not have the permission to add users to the project
-				    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
-				    			.entity("User needs to be member of the project to add a user to it.").build();
-				    }
-				    
-				} catch (UserNotFoundException e) {
-					return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
-							.entity("User with the given login name could not be found.").build();
-				} catch (ProjectNotFoundException e) {
-					return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
-							.entity("Project with the given id could not be found.").build();
-				} catch (SQLException e) {
-	            	logger.printStackTrace(e);
-	            	return Response.serverError().entity("Internal server error.").build();
-	            } catch (ParseException p) {
-		    		logger.printStackTrace(p);
-		    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
-		    	} finally {
-					try {
-						if(connection != null) connection.close();
-					} catch (SQLException e) {
-						logger.printStackTrace(e);
-						return Response.serverError().entity("Internal server error.").build();
-					}
-				}
+			    connection = dbm.getConnection();
+			    
+			    User user = authManager.getUser();
+			    
+			    // get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is part of the project and thus is allowed to add new users
+			    	// extract name of the user given in the request body (as json)
+			    	JSONObject jsonUserToAdd = (JSONObject) JSONValue.parseWithException(inputUser);
+			    	    
+			    	if(jsonUserToAdd.containsKey("loginName")) {
+			    	    String userToAddLoginName = (String) jsonUserToAdd.get("loginName");
+			    	    	
+			    	    User userToAdd = User.loadUserByLoginName(userToAddLoginName, connection);
+			    	    boolean added = project.addUser(userToAdd.getId(), connection);
+			    	    if(added) {
+			    	        // return result: ok
+			    	        return Response.ok(userToAdd.toJSONObject().toJSONString()).build();
+			    	    } else {
+			    	    	// user is already a member of the project
+			    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
+			    	    			.entity("User is already member of the project.").build();
+			    	    }
+			    	} else {
+			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+			    	            .entity("Input user does not contains key 'loginName' which is needed.").build();
+			    	}
+			    } else {
+			    	// user does not have the permission to add users to the project
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to add a user to it.").build();
+			    }
+			    
+			} catch (UserNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("User with the given login name could not be found.").build();
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
 			} catch (SQLException e) {
-				logger.printStackTrace(e);
-				// return server error at the end
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } catch (ParseException p) {
+	    		logger.printStackTrace(p);
+	    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
+	    	} finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
 			}
         }
-		return Response.serverError().entity("Internal server error.").build();
 	}
 	
 	/**
@@ -354,18 +333,12 @@ public class RESTResources {
 	})
 	public Response removeUserFromProject(@PathParam("id") int projectId, String inputUser) {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "removeUserFromProject: removing user from project with id " + projectId);
-        Agent agent = Context.getCurrent().getMainAgent();
-		
-		if (agent instanceof AnonymousAgent) {
-            return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
-        } else if (agent instanceof UserAgent) {
-        	UserAgent userAgent = (UserAgent) agent;
-            String email = userAgent.getEmail();
-            String loginName = userAgent.getLoginName();
-            
-            User user;
+
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
 			try {
-				user = getUser(email, loginName);
+				User user = authManager.getUser();
 				
 				// check if user is allowed to remove a user from the project
 				Connection connection = null;
@@ -423,7 +396,8 @@ public class RESTResources {
 				logger.printStackTrace(e);
 				// return server error at the end
 			}
-        }
+		}
+		
 		return Response.serverError().entity("Internal server error.").build();
 	}
 	
@@ -443,18 +417,13 @@ public class RESTResources {
 	})
 	public Response getActiveUser() {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getActiveUser: trying to retrieve currently active user");
-		Agent agent = Context.getCurrent().getMainAgent();
 		
-		if (agent instanceof AnonymousAgent) {
-            return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
-        } else if (agent instanceof UserAgent) {
-        	UserAgent userAgent = (UserAgent) agent;
-            String email = userAgent.getEmail();
-            String loginName = userAgent.getLoginName();
-            
-            User user;
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			User user;
 			try {
-				user = getUser(email, loginName);
+				user = authManager.getUser();
 				
 				// returns user as json string
 	            return Response.ok(user.toJSONObject().toJSONString()).build();
@@ -462,46 +431,8 @@ public class RESTResources {
 				logger.printStackTrace(e);
 				// return server error at the end
 			}
-        }
-		return Response.serverError().entity("Internal server error.").build();
-	}
-	
-	/**
-	 * Returns the user with the given email and login name.
-	 * When the user is already registered, i.e. can be found in the database,
-	 * then the already registered user is returned.
-	 * Otherwise, when the user is not registered yet, the user gets stored
-	 * into the database.
-	 * @param email Email of the user.
-	 * @param loginName Login name of the user.
-	 * @return User object.
-	 * @throws SQLException If something went wrong with the database.
-	 */
-	private User getUser(String email, String loginName) throws SQLException {
-		User user = null;
-		Connection connection = null;
-		try {
-			connection = dbm.getConnection();
-			// check if user is registered, i.e. exists in the database
-			// when there does not exist a user with the given email, a 
-			// UserNotFoundException gets thrown
-			user = new User(email, connection);
-			// no UserNotFoundException was thrown
-			return user;
-		} catch (UserNotFoundException e) {
-			// user does not exist in the database
-			// register user
-			user = new User(email, loginName);
-			
-			// store user object to database
-			user.persist(connection);
-			return user;
-		} finally {
-			try {
-			    connection.close();
-			} catch (SQLException e) {
-				logger.printStackTrace(e);
-			}
 		}
+		
+		return Response.serverError().entity("Internal server error.").build();
 	}
 }
