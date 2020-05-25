@@ -52,29 +52,20 @@ public class User {
 	 */
 	public void persist(Connection connection) throws SQLException {
 		PreparedStatement statement;
-		try {
-			connection.setAutoCommit(false);
-			
-			// formulate empty statement for storing the user
-			statement = connection.prepareStatement("INSERT INTO User (email, loginName) VALUES (?,?);", Statement.RETURN_GENERATED_KEYS);
-			// set email and loginName of user
-			statement.setString(1, this.email);
-			statement.setString(2, this.loginName);
-			// execute query
-			statement.executeUpdate();
-		    // get the generated project id and close statement
-			ResultSet genKeys = statement.getGeneratedKeys();
-			genKeys.next();
-			this.id = genKeys.getInt(1);
-			statement.close();
-			
-			// no errors occurred, so commit
-			connection.commit();
-		} catch (SQLException e) {
-			// roll back the whole stuff
-			connection.rollback();
-			throw e;
-		}
+		// formulate empty statement for storing the user
+		statement = connection.prepareStatement("INSERT INTO User (email, loginName) VALUES (?,?);", Statement.RETURN_GENERATED_KEYS);
+		// set email and loginName of user
+		statement.setString(1, this.email);
+		statement.setString(2, this.loginName);
+		
+		// execute query
+		statement.executeUpdate();
+		
+		// get the generated project id and close statement
+		ResultSet genKeys = statement.getGeneratedKeys();
+		genKeys.next();
+		this.id = genKeys.getInt(1);
+		statement.close();
 	}
 	
 	/**

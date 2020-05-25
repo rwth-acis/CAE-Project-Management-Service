@@ -12,6 +12,7 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
+import i5.las2peer.services.projectManagementService.exception.NoDefaultRoleFoundException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
 
 /**
@@ -33,14 +34,14 @@ public class Project {
     private String name;
     
     /**
-     * Users that are part of the project.
-     */
-    private ArrayList<User> users;
-    
-    /**
      * Roles that belong to the project.
      */
     private ArrayList<Role> roles;
+    
+    /**
+     * Users that are part of the project.
+     */
+    private ArrayList<User> users;
     
     /**
      * Creates a project object from the given JSON string.
@@ -118,10 +119,43 @@ public class Project {
 		this.id = queryResult.getInt("id");
 		this.name = queryResult.getString("name");
 		
+		// load roles
+		loadRoles(connection);
+		
 		// load users
 	    loadUsers(connection);
 	}
 	
+	/**
+	 * Loads the roles of the project from the database.
+	 * Therefore, the id of the project already needs to be set.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	private void loadRoles(Connection connection) throws SQLException {
+		this.roles = new ArrayList<>();
+		
+		PreparedStatement statement = connection.prepareStatement("SELECT * FROM Role WHERE projectId = ?;");
+		statement.setInt(1, this.id);
+		// execute query
+		ResultSet queryResult = statement.executeQuery();
+		
+		while(queryResult.next()) {
+			int roleId = queryResult.getInt("id");
+			String name = queryResult.getString("name");
+			boolean isDefault = queryResult.getBoolean("is_default");
+			this.roles.add(new Role(roleId, this.id, name, isDefault));
+		}
+		
+		statement.close();
+	}
+	
+	/**
+	 * Loads the users of the project from the database.
+	 * Therefore, the id of the project already needs to be set.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
 	private void loadUsers(Connection connection) throws SQLException {
 		this.users = new ArrayList<>();
 		
@@ -160,7 +194,10 @@ public class Project {
 			this.id = genKeys.getInt(1);
 			statement.close();
 			
-			// store users
+			// store default roles
+			persistPredefinedRoles(connection);
+			
+			// store users (must be done after storing roles, because default role needs to be persisted)
 			persistUsers(connection);
 			
 			// no errors occurred, so commit
@@ -179,21 +216,20 @@ public class Project {
 	}
 	
 	/**
-	 * Getter for the id of the project.
-	 * Note: This is -1 if the project got created from JSON and 
-	 * has not been stored to the database yet.
-	 * @return Id of the project.
+	 * Stores the predefined roles to the project.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
 	 */
-	public int getId() {
-	    return id;
-	}
-	
-	/**
-	 * Getter for the name of the project.
-	 * @return Name of the project.
-	 */
-	public String getName() {
-		return name;
+	private void persistPredefinedRoles(Connection connection) throws SQLException {
+		this.roles = PredefinedRoles.get(this.id);
+		
+		// persist roles
+		for(Role role : this.roles) {
+			role.persist(connection);
+		}
+		
+		// there is no need to connect the project with the roles, since
+		// the roles already contain the projectId as a foreign key
 	}
 	
 	/**
@@ -207,6 +243,13 @@ public class Project {
 		// put attributes
 		jsonProject.put("id", this.id);
 		jsonProject.put("name", this.name);
+		
+		// put roles
+		JSONArray jsonRoles = new JSONArray();
+		for(Role role : roles) {
+			jsonRoles.add(role.toJSONObject());
+		}
+		jsonProject.put("roles", jsonRoles);
 		
 		// put users
 		JSONArray jsonUsers = new JSONArray();
@@ -229,14 +272,44 @@ public class Project {
 		// first check if user is already part of the project
 		if(hasUser(userId, connection)) return false;
 		
+		// do not auto commit after inserting user to ProjectToUser table, because
+		// after that when the role gets set an error might occur
+		connection.setAutoCommit(false);
+		
 		// user is not part of the project yet, so add the user
-		PreparedStatement statement = connection.prepareStatement("INSERT INTO ProjectToUser (projectId, userId) VALUES (?,?);");
+		PreparedStatement statement = connection.prepareStatement("INSERT INTO ProjectToUser (projectId, userId) VALUES (?,?);", Statement.RETURN_GENERATED_KEYS);
 		statement.setInt(1, this.id);
 		statement.setInt(2, userId);
 		// execute update
 		statement.executeUpdate();
+		
+		// get the generated ProjectToUser id and close statement
+		ResultSet genKeys = statement.getGeneratedKeys();
+		genKeys.next();
+		int projectToUserId = genKeys.getInt(1);
+		
 		statement.close();
 		
+		// set role of user to the default one
+		try {
+		    Role defaultRole = this.getDefaultRole();
+		    
+		    statement = connection.prepareStatement("INSERT INTO UserToRole (userId, roleId, projectToUserId) VALUES (?,?,?);");
+		    statement.setInt(1, userId);
+		    statement.setInt(2, defaultRole.getId());
+		    statement.setInt(3, projectToUserId);
+		    
+		    // execute update
+		    statement.executeUpdate();
+		    statement.close();
+		    
+		    // no errors occurred, so commit
+		 	connection.commit();
+		} catch (NoDefaultRoleFoundException e) {
+			// roll back the whole stuff
+			connection.rollback();
+		    throw e;
+		}
 		return true;
 	}
 	
@@ -344,5 +417,36 @@ public class Project {
     		jsonProjects.add(p.toJSONObject());
     	}
     	return jsonProjects;
+	}
+	
+	/**
+	 * Getter for the id of the project.
+	 * Note: This is -1 if the project got created from JSON and 
+	 * has not been stored to the database yet.
+	 * @return Id of the project.
+	 */
+	public int getId() {
+	    return id;
+	}
+	
+	/**
+	 * Getter for the name of the project.
+	 * @return Name of the project.
+	 */
+	public String getName() {
+		return name;
+	}
+	
+	/**
+	 * Iterates over the list of roles of the project and returns the
+	 * one role which is marked as the default role.
+	 * @return Role object where isDefault is set to true.
+	 * @throws NoDefaultRoleFoundException If the list of roles does not contain a default role.
+	 */
+	private Role getDefaultRole() throws NoDefaultRoleFoundException {
+		for(Role role : this.roles) {
+			if(role.isDefault()) return role;
+		}
+		throw new NoDefaultRoleFoundException();
 	}
 }

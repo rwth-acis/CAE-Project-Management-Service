@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS commedit.Role (
   id INT NOT NULL AUTO_INCREMENT,
   projectId INT NOT NULL,
   name VARCHAR(255) NOT NULL,
+  is_default BOOLEAN NOT NULL,
   CONSTRAINT rolePK PRIMARY KEY (id),
   CONSTRAINT roleProjectFK FOREIGN KEY (projectId) REFERENCES commedit.Project(id) ON DELETE CASCADE
 );
@@ -52,7 +53,9 @@ CREATE TABLE IF NOT EXISTS commedit.UserToRole (
   id INT NOT NULL AUTO_INCREMENT,
   userId INT NOT NULL,
   roleId INT NOT NULL,
+  projectToUserId INT NOT NULL,
   CONSTRAINT userToRolePK PRIMARY KEY (id),
   CONSTRAINT userToRoleUserFK FOREIGN KEY (userId) REFERENCES commedit.User(id) ON DELETE CASCADE,
-  CONSTRAINT userToRoleRoleFK FOREIGN KEY (roleId) REFERENCES commedit.Role(id) ON DELETE CASCADE
+  CONSTRAINT userToRoleRoleFK FOREIGN KEY (roleId) REFERENCES commedit.Role(id) ON DELETE CASCADE,
+  CONSTRAINT userToRoleProjectToUserFK FOREIGN KEY (projectToUserId) REFERENCES commedit.ProjectToUser(id) ON DELETE CASCADE
 )
