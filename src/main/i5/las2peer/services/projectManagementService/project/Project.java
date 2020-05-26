@@ -600,6 +600,21 @@ public class Project {
 	}
 	
 	/**
+	 * Disconnects the CAE project from the Requirements Bazaar project in the database.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public void disconnectRequirementsBazaar(Connection connection) throws SQLException {
+		PreparedStatement statement = connection
+				.prepareStatement("UPDATE Project SET reqBazProjectId = NULL, reqBazCategoryId = NULL WHERE id = ?;");
+		statement.setInt(1, this.id);
+		
+		// execute update
+		statement.executeUpdate();
+		statement.close();
+	}
+	
+	/**
 	 * Getter for the id of the project.
 	 * Note: This is -1 if the project got created from JSON and 
 	 * has not been stored to the database yet.

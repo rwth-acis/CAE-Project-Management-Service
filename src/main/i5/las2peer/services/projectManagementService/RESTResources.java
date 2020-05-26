@@ -651,6 +651,63 @@ public class RESTResources {
 	}
 	
 	/**
+	 * Disconnects the Requirements Bazaar from the CAE project.
+	 * @param projectId Id of the project where the Requirements Bazaar category should be disconnected from.
+	 * @return Response with status code (and possibly an error description).
+	 */
+	@DELETE
+	@Path("/projects/{id}/reqbaz")
+	@ApiOperation(value = "Disconnects the Requirements Bazaar from the CAE project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, disconnected Requirements Bazaar from CAE project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized to disconnect Requirements Bazaar."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User needs to be member of the project to disconnect it from the Requirements Baqzaar."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response disconnectProjectRequirementsBazaar(@PathParam("id") int projectId) {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "disconnectProjectRequirementsBazaar: called with project id " + projectId);
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			// check if user is allowed to disconnect the the requirements bazaar from the project
+			Connection connection = null;
+			try {
+		        connection = dbm.getConnection();
+						    
+			    User user = authManager.getUser();
+						    
+				// get project by id (load it from database)
+				Project project = new Project(projectId, connection);
+						    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is member of the project and thus allowed to disconnect the requirements bazaar
+			    	project.disconnectRequirementsBazaar(connection);
+			    	return Response.ok().build();
+			    } else {
+			    	// user is no member of the project and thus not allowed to disconnect the Requirements Bazaar
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to disconnect the Requirements Bazaar.").build();
+			    }
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	/**
 	 * Method for retrieving the currently active user.
 	 * @return Response with the currently active user as JSON string, or error code.
 	 */
