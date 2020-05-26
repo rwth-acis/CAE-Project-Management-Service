@@ -10,6 +10,7 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -286,7 +287,7 @@ public class RESTResources {
 			    	    }
 			    	} else {
 			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
-			    	            .entity("Input user does not contains key 'loginName' which is needed.").build();
+			    	            .entity("Input user does not contain key 'loginName' which is needed.").build();
 			    	}
 			    } else {
 			    	// user does not have the permission to add users to the project
@@ -373,7 +374,7 @@ public class RESTResources {
 			    	    }
 			    	} else {
 			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
-			    	            .entity("Input user does not contains key 'id' which is needed.").build();
+			    	            .entity("Input user does not contain key 'id' which is needed.").build();
 			    	}
 			    } else {
 			    	// user does not have the permission to remove users from the project
@@ -459,7 +460,7 @@ public class RESTResources {
 			    	    }
 			    	} else {
 			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
-			    	            .entity("Input user does not contains key 'name' which is needed.").build();
+			    	            .entity("Input user does not contain key 'name' which is needed.").build();
 			    	}
 			    } else {
 			    	// user does not have the permission to add roles to the project
@@ -543,7 +544,7 @@ public class RESTResources {
 			    	    }
 			    	} else {
 			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
-			    	            .entity("Input role does not contains key 'id' which is needed.").build();
+			    	            .entity("Input role does not contain key 'id' which is needed.").build();
 			    	}
 			    } else {
 			    	// user does not have the permission to remove roles from the project
@@ -555,6 +556,80 @@ public class RESTResources {
 				// role was not included in the project
     	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
     	    			.entity("Project contains no role with the given id.").build();
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } catch (ParseException p) {
+	    		logger.printStackTrace(p);
+	    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
+	    	} finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Updates the Requirements Bazaar config of the project.
+	 * @param projectId Project id of the CAE project where the Requirements Bazaar config should be updated.
+	 * @param inputReqBazConfig JSON object (as string) containing the project and category id of the Requirements Bazaar.
+	 * @return Response with status code (and possibly an error description).
+	 */
+	@PUT
+	@Path("/projects/{id}/reqbaz")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Updates the Requirements Bazaar config of the project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, updated Requirements Bazaar config."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized to update Requirements Bazaar config."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User needs to be member of the project to edit its config."),
+			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Input Requirements Bazaar config is not well formatted or information is missing."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response putProjectReqBaz(@PathParam("id") int projectId, String inputReqBazConfig) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "putProjectReqBaz: called with project id " + projectId);
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			// check if user is allowed to update the requirements bazaar config of the project
+			Connection connection = null;
+			try {
+		        connection = dbm.getConnection();
+						    
+			    User user = authManager.getUser();
+						    
+				// get project by id (load it from database)
+				Project project = new Project(projectId, connection);
+						    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is member of the project and thus allowed to edit its config
+			    	// extract reqbaz projectId and categoryId given in the request body (as json)
+			    	JSONObject jsonReqBazConfig = (JSONObject) JSONValue.parseWithException(inputReqBazConfig);
+			    	
+			    	if(jsonReqBazConfig.containsKey("projectId") && jsonReqBazConfig.containsKey("categoryId")) {
+			    		int reqBazProjectId = ((Long) jsonReqBazConfig.get("projectId")).intValue();
+			    		int reqBazCategoryId = ((Long) jsonReqBazConfig.get("categoryId")).intValue();
+			    		
+			    		project.updateRequirementsBazaarConfig(reqBazProjectId, reqBazCategoryId, connection);
+			            return Response.ok().build();
+			    	} else {
+			    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+			    	            .entity("Input Requirements Bazaar config does not contain key 'projectId' or 'categoryId' which is needed.").build();
+			    	}
+			    } else {
+			    	// user is no member of the project and thus not allowed to edit its config
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to edit its config.").build();
+			    }
 			} catch (ProjectNotFoundException e) {
 				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
 						.entity("Project with the given id could not be found.").build();
