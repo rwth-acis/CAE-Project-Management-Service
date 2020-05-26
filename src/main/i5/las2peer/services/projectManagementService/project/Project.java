@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -45,6 +46,11 @@ public class Project {
     private ArrayList<User> users;
     
     /**
+     * Assigns a role to every user.
+     */
+    private HashMap<User, Role> roleAssignment;
+    
+    /**
      * Creates a project object from the given JSON string.
      * This constructor should be used before storing new projects.
      * Therefore, no project id need to be included in the JSON string yet.
@@ -61,6 +67,8 @@ public class Project {
     	// not be created now (will be done when calling persist() method)
     	this.users = new ArrayList<>();
     	this.users.add(creator);
+    	
+    	this.roleAssignment = new HashMap<>();
     }
     
     /**
@@ -160,6 +168,9 @@ public class Project {
 	private void loadUsers(Connection connection) throws SQLException {
 		this.users = new ArrayList<>();
 		
+		// also prepare map for role assignment
+		this.roleAssignment = new HashMap<>();
+		
 		PreparedStatement statement = connection.prepareStatement("SELECT User.email FROM ProjectToUser, User WHERE ProjectToUser.userId = User.id AND ProjectToUser.projectId = ?;");
 		statement.setInt(1, this.id);
 		// execute query
@@ -167,10 +178,60 @@ public class Project {
 		
 		while(queryResult.next()) {
 			String email = queryResult.getString("email");
-			this.users.add(new User(email, connection));
+			User user = new User(email, connection);
+			
+			// assign users role
+			this.loadUsersRole(user, connection);
+			
+			// add user to users list
+			this.users.add(user);
 		}
 		
 		statement.close();
+	}
+	
+	/**
+	 * Finds out the role of the given user in the current project.
+	 * Therefore, the id of the current project object needs to be set.
+	 * When the role could be found, then it gets assigned to the user by
+	 * adding it to the roleAssignment map.
+	 * @param user User to load the role for.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong (RoleNotFoundException when role does not exist).
+	 */
+	private void loadUsersRole(User user, Connection connection) throws SQLException {
+		PreparedStatement statement = connection
+				.prepareStatement("SELECT UserToRole.roleId FROM UserToRole, ProjectToUser " +
+		                          "WHERE UserToRole.projectToUserId = ProjectToUser.id AND " +
+						          "ProjectToUser.projectId = ? AND ProjectToUser.userId = ?;");
+		
+		statement.setInt(1, this.id);
+		statement.setInt(2, user.getId());
+		// execute query
+		ResultSet queryResult = statement.executeQuery();
+		
+		if(queryResult.next()) {
+			int roleId = queryResult.getInt("roleId");	
+			// find role with the given id in roles list
+			for(Role role : this.roles) {
+				if(role.getId() == roleId) {
+					this.roleAssignment.put(user, role);
+					return;
+				}
+			}
+		}
+		throw new RoleNotFoundException();
+	}
+	
+	/**
+	 * Searches the roleAssignment map for the given user.
+	 * Note: Check if the roleAssignment map is loaded before calling this
+	 * method.
+	 * @param user User object to search the role for.
+	 * @return Role object of the user.
+	 */
+	public Role getRoleByUser(User user) {
+		return this.roleAssignment.get(user);
 	}
 	
 	/**
@@ -212,7 +273,7 @@ public class Project {
 	
 	private void persistUsers(Connection connection) throws SQLException {
 		for(User user : this.users) {
-			addUser(user.getId(), connection);
+			addUser(user, connection, false); // false, because user should not be added to this.users again
 		}
 	}
 	
@@ -253,9 +314,18 @@ public class Project {
 		jsonProject.put("roles", jsonRoles);
 		
 		// put users
+		// this should also include the role of each user; since the role is not stored in
+		// the User object itself (because it does not only depend on the user, but on
+		// the project too) the role needs to be added manually
 		JSONArray jsonUsers = new JSONArray();
 		for(User user : users) {
-			jsonUsers.add(user.toJSONObject());
+			JSONObject jsonUser = user.toJSONObject();
+			
+			// find out id of the role which is assigned to the user
+			int roleId = roleAssignment.get(user).getId();
+			jsonUser.put("roleId", roleId);
+			
+			jsonUsers.add(jsonUser);
 		}
 		jsonProject.put("users", jsonUsers);
 
@@ -328,12 +398,15 @@ public class Project {
 	
 	/**
 	 * Adds the user with the given id to the project.
-	 * @param userId Id of the user to add to the project.
+	 * @param user User object of the user to add to the project.
 	 * @param connection Connection object
+	 * @param addToUsersList Whether the user also should be added to the users list of the Project object.
 	 * @return False if user is already part of the project. True if user was added successfully.
 	 * @throws SQLException If something with the database went wrong.
 	 */
-	public boolean addUser(int userId, Connection connection) throws SQLException {
+	public boolean addUser(User user, Connection connection, boolean addToUsersList) throws SQLException {
+		int userId = user.getId();
+		
 		// first check if user is already part of the project
 		if(hasUser(userId, connection)) return false;
 		
@@ -370,6 +443,13 @@ public class Project {
 		    
 		    // no errors occurred, so commit
 		 	connection.commit();
+		 	
+		 	// also add user to users list of project
+		 	if(addToUsersList) {
+		 	    this.users.add(user);
+		 	}
+		 	// also put role into roleAssignment map
+		 	this.roleAssignment.put(user, defaultRole);
 		} catch (NoDefaultRoleFoundException e) {
 			// roll back the whole stuff
 			connection.rollback();

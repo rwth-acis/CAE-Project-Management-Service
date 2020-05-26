@@ -270,10 +270,15 @@ public class RESTResources {
 			    	    String userToAddLoginName = (String) jsonUserToAdd.get("loginName");
 			    	    	
 			    	    User userToAdd = User.loadUserByLoginName(userToAddLoginName, connection);
-			    	    boolean added = project.addUser(userToAdd.getId(), connection);
+			    	    boolean added = project.addUser(userToAdd, connection, true); // true, because user also should be added to users list of Project object
 			    	    if(added) {
 			    	        // return result: ok
-			    	        return Response.ok(userToAdd.toJSONObject().toJSONString()).build();
+			    	    	// user object should be returned
+			    	    	// also the assigned role should be included
+			    	    	JSONObject o = userToAdd.toJSONObject();
+			    	    	o.put("roleId", project.getRoleByUser(userToAdd).getId());
+			    	    	
+			    	        return Response.ok(o.toJSONString()).build();
 			    	    } else {
 			    	    	// user is already a member of the project
 			    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
