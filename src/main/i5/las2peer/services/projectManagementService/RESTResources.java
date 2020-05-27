@@ -4,7 +4,6 @@ import java.net.HttpURLConnection;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.logging.Level;
 
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -20,9 +19,6 @@ import javax.ws.rs.core.Response;
 import i5.las2peer.api.Context;
 import i5.las2peer.api.ServiceException;
 import i5.las2peer.api.logging.MonitoringEvent;
-import i5.las2peer.api.security.Agent;
-import i5.las2peer.api.security.AnonymousAgent;
-import i5.las2peer.api.security.UserAgent;
 import i5.las2peer.logging.L2pLogger;
 import i5.las2peer.services.projectManagementService.auth.AuthManager;
 import i5.las2peer.services.projectManagementService.database.DatabaseManager;
