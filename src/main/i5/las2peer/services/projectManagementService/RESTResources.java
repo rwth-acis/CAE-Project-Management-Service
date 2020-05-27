@@ -493,7 +493,7 @@ public class RESTResources {
 	 * to check if the user is a member of the project, because only project members 
 	 * should be allowed to remove roles from it.
 	 * @param projectId Id of the project where the role should be removed from.
-	 * @param inputUser JSON object containing an "id" attribute with the id of the role to remove.
+	 * @param inputRole JSON object containing an "id" attribute with the id of the role to remove.
 	 * @return Response with status code (and possibly an error description).
 	 */
 	@DELETE
