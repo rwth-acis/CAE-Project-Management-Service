@@ -72,6 +72,7 @@ public class Project {
      */
     public Project(User creator, String jsonProject) throws ParseException {
     	JSONObject project = (JSONObject) JSONValue.parseWithException(jsonProject);
+    	if(!project.containsKey("name")) throw new ParseException(0, "Attribute 'name' of project is missing.");
     	this.name = (String) project.get("name");
     	
     	// only add the creator as user
