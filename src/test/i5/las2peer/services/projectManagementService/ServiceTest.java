@@ -12,10 +12,8 @@ import java.util.Properties;
 
 import javax.ws.rs.core.MediaType;
 
-import org.json.simple.JSONObject;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import i5.las2peer.api.p2p.ServiceNameVersion;
@@ -40,9 +38,6 @@ public class ServiceTest {
 	 * Database connection used to access database during the tests.
 	 */
 	private static Connection connection;
-	
-	private static final String HTTP_ADDRESS = "http://127.0.0.1";
-	private static final int HTTP_PORT = WebConnector.DEFAULT_HTTP_PORT;
 
 	private static LocalNode node;
 	private static WebConnector connector;
