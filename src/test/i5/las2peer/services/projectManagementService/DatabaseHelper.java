@@ -20,6 +20,7 @@ public class DatabaseHelper {
 				statement = connection.prepareStatement("DELETE FROM " + tableName + ";");
 				statement.executeUpdate();
 			}
+			System.out.println("DatabaseHelper: Cleared database!");
 			return true;
 		} catch (SQLException e) {
 			e.printStackTrace();

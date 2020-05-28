@@ -1,6 +1,7 @@
 package i5.las2peer.services.projectManagementService;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.ByteArrayOutputStream;
@@ -12,6 +13,9 @@ import java.util.Properties;
 
 import javax.ws.rs.core.MediaType;
 
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -27,6 +31,7 @@ import i5.las2peer.services.projectManagementService.ProjectManagementService;
 import i5.las2peer.services.projectManagementService.database.DatabaseManager;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
 import i5.las2peer.services.projectManagementService.project.Project;
+import i5.las2peer.services.projectManagementService.project.User;
 import i5.las2peer.testing.MockAgentFactory;
 
 /**
@@ -142,10 +147,12 @@ public class ServiceTest {
 	}
 	
 	
-	
+	/**
+	 * Tests the POST method of /projects.
+	 */
 	@Test
-	public void testProjectPosting() {
-		System.out.println("------------- Starting testProjectPosting() -------------");
+	public void testPostProjects() {
+		System.out.println("------------- Starting testPostProjects() -------------");
 		try {
 			MiniClient client = new MiniClient();
 			client.setConnectorEndpoint(connector.getHttpEndpoint());
@@ -154,22 +161,23 @@ public class ServiceTest {
 			System.out.println("1. Test without auth");
 			ClientResponse result = client.sendRequest("POST", mainPath + "projects", "", MediaType.APPLICATION_JSON, "", new HashMap<>());
 			assertEquals(401, result.getHttpCode());
-			System.out.println("Result of 'testProjectPosting' without auth: " + result.getResponse().trim());
+			System.out.println("Result of 'testPostProjects' without auth: " + result.getResponse().trim());
 			System.out.println();
 			
 			// test with auth and empty body
+			// therefore, first set testAgent as logged in
 			client.setLogin(testAgent.getIdentifier(), testPass);
 			System.out.println("2. Test with auth and empty body");
 		    result = client.sendRequest("POST", mainPath + "projects", "", MediaType.APPLICATION_JSON, "", new HashMap<>());
 		    assertEquals(400, result.getHttpCode());
-		    System.out.println("Result of 'testProjectPosting' with auth and empty body: " + result.getResponse().trim());
+		    System.out.println("Result of 'testPostProjects' with auth and empty body: " + result.getResponse().trim());
 		    System.out.println();
 			
 			// test with auth and body containing an empty JSON object
 		    System.out.println("3. Test with auth and body containing an empty JSON object");
 		    result = client.sendRequest("POST", mainPath + "projects", "{}", MediaType.APPLICATION_JSON, "", new HashMap<>());
 		    assertEquals(400, result.getHttpCode());
-		    System.out.println("Result of 'testProjectPosting' with auth and body containing an empty JSON object: " + result.getResponse().trim());
+		    System.out.println("Result of 'testPostProjects' with auth and body containing an empty JSON object: " + result.getResponse().trim());
 		    System.out.println();
 		    
 		    // test with auth and correct body
@@ -177,7 +185,7 @@ public class ServiceTest {
 		    System.out.println("4. Test with auth and correct body");
 		    result = client.sendRequest("POST", mainPath + "projects", "{\"name\": \"" + projectName + "\"}", MediaType.APPLICATION_JSON, "", new HashMap<>());
 		    assertEquals(201, result.getHttpCode());
-		    System.out.println("Result of 'testProjectPosting' with auth and correct body: " + result.getResponse().trim());
+		    System.out.println("Result of 'testPostProjects' with auth and correct body: " + result.getResponse().trim());
 		    System.out.println();
 		    
 		    // check if project got really created and can be found in the database now
@@ -189,11 +197,137 @@ public class ServiceTest {
 		    System.out.println("5. Test with auth and same project name as before");
 		    result = client.sendRequest("POST", mainPath + "projects", "{\"name\": \"" + projectName + "\"}", MediaType.APPLICATION_JSON, "", new HashMap<>());
 		    assertEquals(409, result.getHttpCode());
-		    System.out.println("Result of 'testProjectPosting' with auth and same project name as before: " + result.getResponse().trim());
+		    System.out.println("Result of 'testPostProjects' with auth and same project name as before: " + result.getResponse().trim());
 		    System.out.println();
 		} catch(ProjectNotFoundException e) {
 			e.printStackTrace();
 			fail("Tried to create a new project, but project cannot be found in the database afterwards.");
+		} catch (Exception e) {
+			e.printStackTrace();
+			fail("Exception: " + e);
+		}
+	}
+	
+	/**
+	 * Tests the GET method of /projects.
+	 */
+	@Test
+	public void testGetProjects() {
+		System.out.println("------------- Starting testGetProjects() -------------");
+		
+		try {
+			MiniClient client = new MiniClient();
+			client.setConnectorEndpoint(connector.getHttpEndpoint());
+			
+			// first test without auth
+			System.out.println("1. Test without auth");
+			ClientResponse result = client.sendRequest("GET", mainPath + "projects", "", MediaType.APPLICATION_JSON, "", new HashMap<>());
+			assertEquals(401, result.getHttpCode());
+			System.out.println("Result of 'testGetProjects' without auth: " + result.getResponse().trim());
+			System.out.println();
+			
+			// test with auth (now the result should be an empty list, since the database gets cleared when test starts and thus
+			// no project exists)
+			// therefore, first set testAgent as logged in
+		    client.setLogin(testAgent.getIdentifier(), testPass);
+			System.out.println("2. Test with auth");
+			result = client.sendRequest("GET", mainPath + "projects", "", MediaType.APPLICATION_JSON, "", new HashMap<>());
+			assertEquals(200, result.getHttpCode());
+			assertEquals("[]", result.getResponse().trim());
+			System.out.println("Result of 'testGetProjects' with auth: " + result.getResponse().trim());
+			System.out.println();
+			
+			// now we manually create a project
+			// therefore, we need a User object (just get the one from testAgent)
+			User user = new User(testAgent.getEmail(), connection);
+			// now create the project
+			String projectName = "Project A";
+			Project project = new Project(user, "{\"name\": \"" + projectName + "\"}");
+			project.persist(connection);
+			
+			// now we can send a request to check if the resulting list contains the newly created project
+			System.out.println("3. Test with auth and one project");
+			result = client.sendRequest("GET", mainPath + "projects", "", MediaType.APPLICATION_JSON, "", new HashMap<>());
+			assertEquals(200, result.getHttpCode());
+			
+			// now do a very basic check and see if a project with the name of the new one exists in the result list
+			JSONArray resultingList = (JSONArray) JSONValue.parse(result.getResponse().trim());
+			JSONObject resultingProject = null;
+			for(Object entry : resultingList) {
+				JSONObject jsonEntry = (JSONObject) entry;
+				if(jsonEntry.get("name").equals(projectName)) {
+					resultingProject = jsonEntry;
+					break;
+				}
+			}
+			assertTrue("Request result does not contain created project.", resultingProject != null);
+			
+			// check for some attributes and if at least one user exists
+			assertTrue("Request result does not contain attribute 'roles'.", resultingProject.containsKey("roles"));
+			assertTrue("Request result does not contain attribute 'users'.", resultingProject.containsKey("users"));
+			JSONArray users = (JSONArray) resultingProject.get("users");
+			assertTrue("Request result does not contain at least one user.", !users.isEmpty());
+			
+			System.out.println("Result of 'testGetProjects' with auth and one project: " + result.getResponse().trim());
+			System.out.println();
+		} catch (Exception e) {
+			e.printStackTrace();
+			fail("Exception: " + e);
+		}
+	}
+	
+	/**
+	 * Tests the GET method of /projects/{projectName}.
+	 */
+	@Test
+	public void testGetProjectsByName() {
+        System.out.println("------------- Starting testGetProjectsByName() -------------");
+		
+		try {
+			MiniClient client = new MiniClient();
+			client.setConnectorEndpoint(connector.getHttpEndpoint());
+			
+			String projectName = "ProjectA";
+			
+			// first test without auth (this should work, because no auth is needed)
+			// since the project that gets searched does not exist (since database got cleared before test)
+			// an empty array should be returned
+			System.out.println("1. Test without auth");
+			ClientResponse result = client.sendRequest("GET", mainPath + "projects/" + projectName, "", MediaType.APPLICATION_JSON, "", new HashMap<>());
+			assertEquals(200, result.getHttpCode());
+			assertEquals("[]", result.getResponse().trim());
+			System.out.println("Result of 'testGetProjectsByName' without auth: " + result.getResponse().trim());
+			System.out.println();
+			
+			// now we manually create a project
+			// therefore, we need a User object
+			// since we have not sent a request with the testAgent logged in yet, we first
+			// need to store a new User object
+			User user = new User("test@test.de", "TestUser");
+			user.persist(connection);
+			// now create the project
+		    Project project = new Project(user, "{\"name\": \"" + projectName + "\"}");
+			project.persist(connection);
+			
+			// now send a request and check if the result contains the project
+			System.out.println("2. Test without auth and one project");
+			result = client.sendRequest("GET", mainPath + "projects/" + projectName, "", MediaType.APPLICATION_JSON, "", new HashMap<>());
+			assertEquals(200, result.getHttpCode());
+			
+			// now do a very basic check and see if a project with the name of the new one exists in the result list
+			JSONArray resultingList = (JSONArray) JSONValue.parse(result.getResponse().trim());
+			JSONObject resultingProject = null;
+			for(Object entry : resultingList) {
+				JSONObject jsonEntry = (JSONObject) entry;
+				if(jsonEntry.get("name").equals(projectName)) {
+					resultingProject = jsonEntry;
+					break;
+				}
+			}
+			assertTrue("Request result does not contain created project.", resultingProject != null);
+			
+			System.out.println("Result of 'testGetProjectsByName' without auth: " + result.getResponse().trim());
+			System.out.println();
 		} catch (Exception e) {
 			e.printStackTrace();
 			fail("Exception: " + e);
