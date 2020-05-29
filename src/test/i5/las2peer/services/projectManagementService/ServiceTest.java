@@ -36,6 +36,8 @@ import i5.las2peer.testing.MockAgentFactory;
 
 /**
  * Test class for the CAE Project Management Service. Only tests on a REST level.
+ * Note, that a database needs to be available and accessable by using the config 
+ * of the properties file.
  */
 public class ServiceTest {
 
@@ -339,7 +341,7 @@ public class ServiceTest {
 	 */
 	@Test
 	public void testPostProjectsUsers() {
-		System.out.println("------------- Starting testGetProjectsByName() -------------");
+		System.out.println("------------- Starting testPostProjectsUsers() -------------");
 		
 		try {
 			MiniClient client = new MiniClient();
@@ -399,6 +401,69 @@ public class ServiceTest {
 			assertTrue("Tried to add user to project, but after that user is not included in users list of project.", 
 					updatedProject.hasUser(user2.getId(), connection));
 			System.out.println("Result of 'testPostProjectsUsers' with auth, existing project and existing user to add: " + result.getResponse().trim());
+			System.out.println();
+		} catch (Exception e) {
+			e.printStackTrace();
+			fail("Exception: " + e);
+		}
+	}
+	
+	/**
+	 * Tests the DELETE method of /projects/{id}/users.
+	 */
+	@Test
+	public void testDeleteProjectsUsers() {
+		System.out.println("------------- Starting testDeleteProjectsUsers() -------------");
+		try {
+			MiniClient client = new MiniClient();
+			client.setConnectorEndpoint(connector.getHttpEndpoint());
+			
+			// first test without auth
+			System.out.println("1. Test without auth");
+			ClientResponse result = client.sendRequest("DELETE", mainPath + "projects/1/users/1", "");
+			// without auth this should not be possible
+			assertEquals(401, result.getHttpCode());
+			System.out.println("Result of 'testDeleteProjectsUsers' without auth: " + result.getResponse().trim());
+			System.out.println();
+			
+			// try with auth now (project with id 1 should not exist)
+			client.setLogin(testAgent.getIdentifier(), testPass);
+			System.out.println("2. Test with auth but non-existing project");
+			result = client.sendRequest("DELETE", mainPath + "projects/1/users/1", "");
+			// since the project should not exist, we expect to get 404
+			assertEquals(404, result.getHttpCode());
+			System.out.println("Result of 'testDeleteProjectsUsers' with auth but non-existing project: " + result.getResponse().trim());
+			System.out.println();
+			
+			// create and store a project with testAgent as creator
+			User user = new User(testAgent.getEmail(), connection);
+			String projectName = "ProjectA";
+			Project project = new Project(user, "{\"name\": \"" + projectName + "\"}");
+			project.persist(connection);
+			int projectId = project.getId();
+			
+			// now we test removing a user from the project which does not exist in the database
+			System.out.println("3. Test with auth, existing project but non-existing user to remove");
+		    result = client.sendRequest("DELETE", mainPath + "projects/" + projectId + "/users/10", "");
+			// since there should not exist a user with the id "10" in the database
+			// we expect to get 404 status code
+		    assertEquals(404, result.getHttpCode());
+			System.out.println("Result of 'testDeleteProjectsUsers' with auth, existing project but non-existing user to remove: " + result.getResponse().trim());
+			System.out.println();
+			
+			// add a second user to the project manually
+			User user2 = new User("test@test.de", "TestUser");
+			user2.persist(connection);
+			project.addUser(user2, connection, true);
+			
+			// try to remove user2 from the project
+			System.out.println("4. Test with auth, existing project and existing user to remove");
+		    result = client.sendRequest("DELETE", mainPath + "projects/" + projectId + "/users/" + user2.getId(), "");
+		    assertEquals(200, result.getHttpCode());
+		    // reload project to check if user got really removed
+		    project = new Project(projectName, connection);
+		    assertTrue("User is still member of the project, but should not be.", !project.hasUser(user2.getId(), connection));
+		    System.out.println("Result of 'testDeleteProjectsUsers' with auth, existing project and existing user to remove: " + result.getResponse().trim());
 			System.out.println();
 		} catch (Exception e) {
 			e.printStackTrace();
