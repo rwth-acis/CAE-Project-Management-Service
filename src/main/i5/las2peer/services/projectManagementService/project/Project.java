@@ -256,6 +256,8 @@ public class Project {
 	 */
 	public void persist(Connection connection) throws SQLException {
 		PreparedStatement statement;
+		// store current value of auto commit
+		boolean autoCommitBefore = connection.getAutoCommit();
 		try {
 			connection.setAutoCommit(false);
 			
@@ -283,6 +285,9 @@ public class Project {
 			// roll back the whole stuff
 			connection.rollback();
 			throw e;
+		} finally {
+			// reset auto commit to previous value
+			connection.setAutoCommit(autoCommitBefore);
 		}
 	}
 	
