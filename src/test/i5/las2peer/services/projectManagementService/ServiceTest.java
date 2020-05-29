@@ -333,4 +333,76 @@ public class ServiceTest {
 			fail("Exception: " + e);
 		}
 	}
+	
+	/**
+	 * Tests the POST method of /projects/{id}/users.
+	 */
+	@Test
+	public void testPostProjectsUsers() {
+		System.out.println("------------- Starting testGetProjectsByName() -------------");
+		
+		try {
+			MiniClient client = new MiniClient();
+			client.setConnectorEndpoint(connector.getHttpEndpoint());
+			
+			// first test without auth
+			System.out.println("1. Test without auth");
+			ClientResponse result = client.sendRequest("POST", mainPath + "projects/1/users", "", MediaType.APPLICATION_JSON, "", new HashMap<>());
+			// without auth this should not be possible
+			assertEquals(401, result.getHttpCode());
+			System.out.println("Result of 'testPostProjectsUsers' without auth: " + result.getResponse().trim());
+			System.out.println();
+			
+			// try with auth now (project with id 1 should not exist)
+			client.setLogin(testAgent.getIdentifier(), testPass);
+			System.out.println("2. Test with auth but non-existing project");
+			result = client.sendRequest("POST", mainPath + "projects/1/users", "", MediaType.APPLICATION_JSON, "", new HashMap<>());
+		    // since the project should not exist, we expect to get 404
+			assertEquals(404, result.getHttpCode());
+			System.out.println("Result of 'testPostProjectsUsers' with auth but non-existing project: " + result.getResponse().trim());
+			System.out.println();
+			
+			// create and store a project with testAgent as creator
+			User user = new User(testAgent.getEmail(), connection);
+			String projectName = "ProjectA";
+			Project project = new Project(user, "{\"name\": \"" + projectName + "\"}");
+			project.persist(connection);
+			int projectId = project.getId();
+			
+			// send request without body
+			System.out.println("3. Test with auth, existing project but empty body");
+			result = client.sendRequest("POST", mainPath + "projects/" + projectId + "/users", "", MediaType.APPLICATION_JSON, "", new HashMap<>());
+		    // since the input user is not well formatted (or body empty), we expect to get 400
+			assertEquals(400, result.getHttpCode());
+			System.out.println("Result of 'testPostProjectsUsers' with auth, existing project but empty body: " + result.getResponse().trim());
+			System.out.println();
+			
+			// now we test adding a user to the project which does not exist in the database
+			System.out.println("4. Test with auth, existing project but non-existing user to add");
+			result = client.sendRequest("POST", mainPath + "projects/" + projectId + "/users", "{\"loginName\": \"TestUserLoginName\"}", MediaType.APPLICATION_JSON, "", new HashMap<>());
+			// since there should not exist a user with the loginName "TestUserLoginName" in the database
+			// we expect to get 404 status code
+			assertEquals(404, result.getHttpCode());
+			System.out.println("Result of 'testPostProjectsUsers' with auth, existing project but non-existing user to add: " + result.getResponse().trim());
+			System.out.println();
+			
+			// now we need a second user in the database who can be added as a project member
+			User user2 = new User("email2@test.de", "TestUser");
+			user2.persist(connection);
+			
+			// try to add user2 to the project
+			System.out.println("5. Test with auth, existing project and existing user to add");
+			result = client.sendRequest("POST", mainPath + "projects/" + projectId + "/users", "{\"loginName\": \"TestUser\"}", MediaType.APPLICATION_JSON, "", new HashMap<>());
+			assertEquals(200, result.getHttpCode());
+			// check if project in database now contains user2
+			Project updatedProject = new Project(projectName, connection);
+			assertTrue("Tried to add user to project, but after that user is not included in users list of project.", 
+					updatedProject.hasUser(user2.getId(), connection));
+			System.out.println("Result of 'testPostProjectsUsers' with auth, existing project and existing user to add: " + result.getResponse().trim());
+			System.out.println();
+		} catch (Exception e) {
+			e.printStackTrace();
+			fail("Exception: " + e);
+		}
+	}
 }
