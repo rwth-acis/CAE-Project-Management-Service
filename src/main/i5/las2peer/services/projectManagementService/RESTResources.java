@@ -320,24 +320,22 @@ public class RESTResources {
 	 * to check if the user is a member of the project, because only project members 
 	 * should be allowed to remove users from it.
 	 * @param projectId Id of the project where the user should be removed from.
-	 * @param inputUser JSON object containing an "id" attribute with the id of the user to remove.
+	 * @param userId Id of the user to remove from the project.
 	 * @return Response with status code (and possibly an error description).
 	 */
 	@DELETE
-	@Path("/projects/{id}/users")
-	@Consumes(MediaType.APPLICATION_JSON)
+	@Path("/projects/{projectId}/users/{userId}")
 	@ApiOperation(value = "Removes a user from the project.")
 	@ApiResponses(value = {
 			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, removed user from project."),
 			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
 			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to remove users from it."),
 			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or user to remove from project could not be found or user to remove is no member of the project."),
-			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Input user is not well formatted."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
-	public Response removeUserFromProject(@PathParam("id") int projectId, String inputUser) {
-		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "removeUserFromProject: removing user from project with id " + projectId);
-
+	public Response removeUserFromProject(@PathParam("projectId") int projectId, @PathParam("userId") int userId) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "removeUserFromProject: removing user with id " + userId + " from project with id " + projectId);
+		
 		if(authManager.isAnonymous()) {
 			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
 		} else {
@@ -353,25 +351,16 @@ public class RESTResources {
 			    
 			    if(project.hasUser(user.getId(), connection)) {
 			    	// user is part of the project and thus is allowed to remove users
-			    	// extract id of the user given in the request body (as json)
-			    	JSONObject jsonUserToRemove = (JSONObject) JSONValue.parseWithException(inputUser);
-			    	    
-			    	if(jsonUserToRemove.containsKey("id")) {
-			    	    int userToRemoveId = ((Long) jsonUserToRemove.get("id")).intValue();
-			    	    	
-			    	    boolean removed = project.removeUser(userToRemoveId, connection);
-			    	    if(removed) {
-			    	        // return result: ok
-			    	        return Response.ok().build();
-			    	    } else {
-			    	    	// user is no member of the project
-			    	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
-			    	    			.entity("User is no member of the project.").build();
-			    	    }
-			    	} else {
-			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
-			    	            .entity("Input user does not contain key 'id' which is needed.").build();
-			    	}
+	    	    	
+		    	    boolean removed = project.removeUser(userId, connection);
+		    	    if(removed) {
+		    	        // return result: ok
+		    	        return Response.ok().build();
+		    	    } else {
+		    	    	// user is no member of the project
+		    	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+		    	    			.entity("User is no member of the project.").build();
+		    	    }
 			    } else {
 			    	// user does not have the permission to remove users from the project
 			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
@@ -384,10 +373,7 @@ public class RESTResources {
 			} catch (SQLException e) {
             	logger.printStackTrace(e);
             	return Response.serverError().entity("Internal server error.").build();
-            } catch (ParseException p) {
-	    		logger.printStackTrace(p);
-	    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
-	    	} finally {
+            } finally {
 				try {
 					if(connection != null) connection.close();
 				} catch (SQLException e) {
@@ -489,24 +475,22 @@ public class RESTResources {
 	 * to check if the user is a member of the project, because only project members 
 	 * should be allowed to remove roles from it.
 	 * @param projectId Id of the project where the role should be removed from.
-	 * @param inputRole JSON object containing an "id" attribute with the id of the role to remove.
+	 * @param roleId Id of the role to remove.
 	 * @return Response with status code (and possibly an error description).
 	 */
 	@DELETE
-	@Path("/projects/{id}/roles")
-	@Consumes(MediaType.APPLICATION_JSON)
+	@Path("/projects/{projectId}/roles/{roleId}")
 	@ApiOperation(value = "Removes a role from the project.")
 	@ApiResponses(value = {
 			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, removed role from project."),
 			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
 			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to remove roles from it."),
 			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or role to remove from project could not be found."),
-			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Input role is not well formatted."),
 			@ApiResponse(code = HttpURLConnection.HTTP_CONFLICT, message = "The role is assigned to at least one user and thus cannot be removed."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
-	public Response removeRoleFromProject(@PathParam("id") int projectId, String inputRole) {
-		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "removeRoleFromProject: removing role from project with id " + projectId);
+	public Response removeRoleFromProject(@PathParam("projectId") int projectId, @PathParam("roleId") int roleId) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "removeRoleFromProject: removing role with roleId " + roleId + " from project with id " + projectId);
 
 		if(authManager.isAnonymous()) {
 			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
@@ -523,25 +507,15 @@ public class RESTResources {
 			    
 			    if(project.hasUser(user.getId(), connection)) {
 			    	// user is part of the project and thus is allowed to remove roles
-			    	// extract id of the role given in the request body (as json)
-			    	JSONObject jsonRoleToRemove = (JSONObject) JSONValue.parseWithException(inputRole);
-			    	    
-			    	if(jsonRoleToRemove.containsKey("id")) {
-			    	    int roleToRemoveId = ((Long) jsonRoleToRemove.get("id")).intValue();
-			    	    	
-			    	    boolean removed = project.removeRole(roleToRemoveId, connection);
-			    	    if(removed) {
-			    	        // return result: ok
-			    	        return Response.ok().build();
-			    	    } else {
-			    	    	// role could not be removed because it is still assigned to at least one user
-			    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
-			    	    			.entity("The role is assigned to at least one user and thus cannot be removed.").build();
-			    	    }
-			    	} else {
-			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
-			    	            .entity("Input role does not contain key 'id' which is needed.").build();
-			    	}
+			    	boolean removed = project.removeRole(roleId, connection);
+		    	    if(removed) {
+		    	        // return result: ok
+		    	        return Response.ok().build();
+		    	    } else {
+		    	    	// role could not be removed because it is still assigned to at least one user
+		    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
+		    	    			.entity("The role is assigned to at least one user and thus cannot be removed.").build();
+		    	    }
 			    } else {
 			    	// user does not have the permission to remove roles from the project
 			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
@@ -558,10 +532,7 @@ public class RESTResources {
 			} catch (SQLException e) {
             	logger.printStackTrace(e);
             	return Response.serverError().entity("Internal server error.").build();
-            } catch (ParseException p) {
-	    		logger.printStackTrace(p);
-	    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
-	    	} finally {
+            } finally {
 				try {
 					if(connection != null) connection.close();
 				} catch (SQLException e) {
