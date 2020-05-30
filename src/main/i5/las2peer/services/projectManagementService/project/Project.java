@@ -639,6 +639,14 @@ public class Project {
 	}
 	
 	/**
+	 * Getter for the list of roles of the project.
+	 * @return ArrayList of Role objects that belong to the project.
+	 */
+	public ArrayList<Role> getRoles() {
+		return roles;
+	}
+	
+	/**
 	 * Iterates over the list of roles of the project and returns the
 	 * one role which is marked as the default role.
 	 * @return Role object where isDefault is set to true.
