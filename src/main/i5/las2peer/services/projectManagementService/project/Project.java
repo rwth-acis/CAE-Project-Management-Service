@@ -13,6 +13,7 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
+import i5.las2peer.services.projectManagementService.component.Component;
 import i5.las2peer.services.projectManagementService.exception.NoDefaultRoleFoundException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
@@ -63,6 +64,11 @@ public class Project {
     private int reqBazCategoryId;
     
     /**
+     * Components that were created "by the project".
+     */
+    private ArrayList<Component> components;
+    
+    /**
      * Creates a project object from the given JSON string.
      * This constructor should be used before storing new projects.
      * Therefore, no project id need to be included in the JSON string yet.
@@ -82,6 +88,7 @@ public class Project {
     	this.users.add(creator);
     	
     	this.roleAssignment = new HashMap<>();
+    	this.components = new ArrayList<>();
     }
     
     /**
@@ -148,6 +155,9 @@ public class Project {
 		
 		// load users
 	    loadUsers(connection);
+	    
+	    // load components
+	    loadComponents(connection);
 	}
 	
 	/**
@@ -200,6 +210,32 @@ public class Project {
 			
 			// add user to users list
 			this.users.add(user);
+		}
+		
+		statement.close();
+	}
+	
+	/**
+	 * Loads the components that were created "by the project".
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	private void loadComponents(Connection connection) throws SQLException {
+		this.components = new ArrayList<>();
+		
+		PreparedStatement statement = connection
+				.prepareStatement("SELECT ProjectToComponent.componentId FROM ProjectToComponent WHERE projectId = ?;");
+		statement.setInt(1, this.id);
+		
+		// execute query
+		ResultSet queryResult = statement.executeQuery();
+		
+		while(queryResult.next()) {
+			try {
+				this.components.add(new Component(queryResult.getInt(1), connection));
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
 		}
 		
 		statement.close();
@@ -644,6 +680,14 @@ public class Project {
 	 */
 	public ArrayList<Role> getRoles() {
 		return roles;
+	}
+	
+	/**
+	 * Getter for the list of components that were created "by the project".
+	 * @return ArrayList of Component objects that belong to the project.
+	 */
+	public ArrayList<Component> getComponents() {
+		return components;
 	}
 	
 	/**

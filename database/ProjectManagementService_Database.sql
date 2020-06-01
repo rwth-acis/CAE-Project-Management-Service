@@ -60,4 +60,28 @@ CREATE TABLE IF NOT EXISTS commedit.UserToRole (
   CONSTRAINT userToRoleUserFK FOREIGN KEY (userId) REFERENCES commedit.User(id) ON DELETE CASCADE,
   CONSTRAINT userToRoleRoleFK FOREIGN KEY (roleId) REFERENCES commedit.Role(id) ON DELETE CASCADE,
   CONSTRAINT userToRoleProjectToUserFK FOREIGN KEY (projectToUserId) REFERENCES commedit.ProjectToUser(id) ON DELETE CASCADE
-)
+);
+
+--
+-- Table structure for table Component.
+--
+CREATE TABLE IF NOT EXISTS commedit.Component (
+  id INT NOT NULL AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(255) NOT NULL,
+  versionedModelId INT NOT NULL,
+  CONSTRAINT componentPK PRIMARY KEY (id),
+  CONSTRAINT componentVersionedModelFK FOREIGN KEY (versionedModelId) REFERENCES commedit.VersionedModel(id) ON DELETE CASCADE
+);
+
+--
+-- Table structure for table ProjectToComponent.
+--
+CREATE TABLE IF NOT EXISTS commedit.ProjectToComponent (
+  id INT NOT NULL AUTO_INCREMENT,
+  projectId INT NOT NULL,
+  componentId INT NOT NULL,
+  CONSTRAINT projectToComponentPK PRIMARY KEY (id),
+  CONSTRAINT projectToComponentProjectFK FOREIGN KEY (projectId) REFERENCES commedit.Project(id) ON DELETE CASCADE,
+  CONSTRAINT projectToComponentComponentFK FOREIGN KEY (componentId) REFERENCES commedit.Component(id) ON DELETE CASCADE
+);

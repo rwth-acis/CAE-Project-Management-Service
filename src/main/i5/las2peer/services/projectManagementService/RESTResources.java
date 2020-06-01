@@ -21,6 +21,7 @@ import i5.las2peer.api.ServiceException;
 import i5.las2peer.api.logging.MonitoringEvent;
 import i5.las2peer.logging.L2pLogger;
 import i5.las2peer.services.projectManagementService.auth.AuthManager;
+import i5.las2peer.services.projectManagementService.component.Component;
 import i5.las2peer.services.projectManagementService.database.DatabaseManager;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
@@ -37,6 +38,7 @@ import io.swagger.annotations.Info;
 import io.swagger.annotations.License;
 import io.swagger.annotations.SwaggerDefinition;
 
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
@@ -670,6 +672,123 @@ public class RESTResources {
 					logger.printStackTrace(e);
 					return Response.serverError().entity("Internal server error.").build();
 				}
+			}
+		}
+	}
+	
+	/**
+	 * Adds a component to a project.
+	 * @param projectId Id of the project where a component should be added to.
+	 * @param inputComponent JSON representation of the component to add to the project.
+	 * @return Response with status code (and possibly an error description).
+	 */
+	@POST
+	@Path("/projects/{projectId}/components")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Adds component to project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, added component to the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized to add component to project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User needs to be member of the project to add components to it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Given component is not well formatted or attributes are missing."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response postProjectComponent(@PathParam("projectId") int projectId, String inputComponent) {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "postProjectComponent: trying to add component to project");
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			// check if user is allowed to add a component to the project
+			Connection connection = null;
+			try {
+			    connection = dbm.getConnection();
+									    
+				User user = authManager.getUser();
+									    
+				// get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is member of the project and thus allowed to add components to it
+			    	Component component = new Component(inputComponent);
+			    	// persist component
+			    	component.persist(project, connection);
+			    	
+			    	// send component as result
+			    	return Response.ok(component.toJSONObject().toJSONString()).build();
+			    } else {
+			    	// user is no member of the project and thus not allowed to add components to it
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to add components to it.").build();
+			    }
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } catch (ParseException e) {
+				logger.printStackTrace(e);
+				return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
+			} finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Lists the components of the project.
+	 * @param projectId Id of the project where the components should be listed.
+	 * @return Response with status (and possibly error message).
+	 */
+	@GET
+	@Path("/projects/{projectId}/components")
+	@ApiOperation(value = "Lists the components of the project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, returns list of components of the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response getProjectComponents(@PathParam("projectId") int projectId) {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProjectComponents: trying to get components of project with id " + projectId);
+		
+        Connection connection = null;
+		try {
+			connection = dbm.getConnection();
+			
+			// load project by id
+			Project project = new Project(projectId, connection);
+			
+			// get components of the project
+			ArrayList<Component> components = project.getComponents();
+			
+			// create JSONArray of the ArrayList
+			JSONArray jsonComponents = new JSONArray();
+			for(Component component : components) {
+				jsonComponents.add(component.toJSONObject());
+			}
+			
+			// return JSONArray as string
+        	return Response.ok(jsonComponents.toJSONString()).build();
+		} catch (ProjectNotFoundException e) {
+			logger.printStackTrace(e);
+			return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+					.entity("Project with the given id could not be found.").build();
+		} catch (SQLException e) {
+			logger.printStackTrace(e);
+			return Response.serverError().entity("Internal server error.").build();
+		} finally {
+			try {
+			    connection.close();
+			} catch (SQLException e) {
+				logger.printStackTrace(e);
 			}
 		}
 	}
