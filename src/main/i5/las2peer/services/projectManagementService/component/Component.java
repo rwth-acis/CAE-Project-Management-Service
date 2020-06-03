@@ -49,8 +49,6 @@ public class Component {
     	if(!component.containsKey("type")) throw new ParseException(0, "Attribute 'type' of component is missing.");
     	String typeStr = (String) component.get("type");
         setType(typeStr);
-    	
-    	// TODO: create versioned model
 	}
 	
 	/**
@@ -121,16 +119,11 @@ public class Component {
 		try {
 			connection.setAutoCommit(false);
 			
-			// first create an empty versioned model
-			PreparedStatement statement = connection.prepareStatement("INSERT INTO VersionedModel () VALUES ();", Statement.RETURN_GENERATED_KEYS);
-			statement.executeUpdate();
-			ResultSet genKeys = statement.getGeneratedKeys();
-			genKeys.next();
-			int versionedModelId = genKeys.getInt(1);
-			statement.close();
+			// create empty versioned model
+			this.versionedModelId = ComponentInitHelper.createEmptyVersionedModel(connection);
 			
-		    // insert without versionedModelId first (since we do not got it yet)
-		    statement = connection
+			// create component
+		    PreparedStatement statement = connection
 			    	.prepareStatement("INSERT INTO Component (name, type, versionedModelId) VALUES (?,?,?);", Statement.RETURN_GENERATED_KEYS);
 		    statement.setString(1, this.name);
 		    statement.setString(2, typeToString());
@@ -139,7 +132,7 @@ public class Component {
 		    // execute update
 		    statement.executeUpdate();
 		    // get the generated component id and close statement
-		    genKeys = statement.getGeneratedKeys();
+		    ResultSet genKeys = statement.getGeneratedKeys();
 		    genKeys.next();
 		    this.id = genKeys.getInt(1);
 		    statement.close();
