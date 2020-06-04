@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS commedit.Project (
   id INT NOT NULL AUTO_INCREMENT,
   reqBazProjectId INT,
   reqBazCategoryId INT,
+  gitHubProjectId INT,
   name VARCHAR(255) NOT NULL,
   CONSTRAINT projectPK PRIMARY KEY (id)
 );

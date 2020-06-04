@@ -23,6 +23,7 @@ import i5.las2peer.logging.L2pLogger;
 import i5.las2peer.services.projectManagementService.auth.AuthManager;
 import i5.las2peer.services.projectManagementService.component.Component;
 import i5.las2peer.services.projectManagementService.database.DatabaseManager;
+import i5.las2peer.services.projectManagementService.exception.GitHubException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.UserNotFoundException;
@@ -127,6 +128,10 @@ public class RESTResources {
 			} catch (ParseException e) {
 				logger.printStackTrace(e);
 				return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).build();
+			} catch (GitHubException e) {
+				logger.printStackTrace(e);
+				return Response.serverError()
+						.entity("Internal server error: An error occurred while creating the connected GitHub project.").build();
 			} finally {
 				try {
 					if(connection != null) connection.close();

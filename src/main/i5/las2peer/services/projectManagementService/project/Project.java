@@ -14,9 +14,11 @@ import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
 import i5.las2peer.services.projectManagementService.component.Component;
+import i5.las2peer.services.projectManagementService.exception.GitHubException;
 import i5.las2peer.services.projectManagementService.exception.NoDefaultRoleFoundException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
+import i5.las2peer.services.projectManagementService.github.GitHubHelper;
 
 /**
  * (Data-)Class for Projects. Provides means to convert JSON to Object and Object
@@ -62,6 +64,11 @@ public class Project {
      * to this CAE project.
      */
     private int reqBazCategoryId;
+    
+    /**
+     * Id of the GitHub project which is connected to the CAE project.
+     */
+    private int gitHubProjectId;
     
     /**
      * Components that were created "by the project".
@@ -149,6 +156,7 @@ public class Project {
 		this.name = queryResult.getString("name");
 		this.reqBazProjectId = queryResult.getInt("reqBazProjectId");
 		this.reqBazCategoryId = queryResult.getInt("reqBazCategoryId");
+		this.gitHubProjectId = queryResult.getInt("gitHubProjectId");
 		
 		// load roles
 		loadRoles(connection);
@@ -289,18 +297,23 @@ public class Project {
 	 * Persists a project.
 	 * @param connection a Connection Object
 	 * @throws SQLException if something with the database has gone wrong
+	 * @throws GitHubException If something went wrong while creating GitHub project.
 	 */
-	public void persist(Connection connection) throws SQLException {
+	public void persist(Connection connection) throws SQLException, GitHubException {
 		PreparedStatement statement;
 		// store current value of auto commit
 		boolean autoCommitBefore = connection.getAutoCommit();
 		try {
 			connection.setAutoCommit(false);
 			
+			// try to create GitHub project
+			int gitHubProjectId = GitHubHelper.getInstance().createPublicGitHubProject(this.name);
+			
 			// formulate empty statement for storing the project
-			statement = connection.prepareStatement("INSERT INTO Project (name) VALUES (?);", Statement.RETURN_GENERATED_KEYS);
-			// set name of project
+			statement = connection.prepareStatement("INSERT INTO Project (name, gitHubProjectId) VALUES (?,?);", Statement.RETURN_GENERATED_KEYS);
+			// set name and GitHub project id of project
 			statement.setString(1, this.name);
+			statement.setInt(2, gitHubProjectId);
 			// execute update
 			statement.executeUpdate();
 		    // get the generated project id and close statement
@@ -363,6 +376,7 @@ public class Project {
 		jsonProject.put("name", this.name);
 		jsonProject.put("reqBazProjectId", this.reqBazProjectId);
 		jsonProject.put("reqBazCategoryId", this.reqBazCategoryId);
+		jsonProject.put("gitHubProjectId", this.gitHubProjectId);
 		
 		// put roles
 		JSONArray jsonRoles = new JSONArray();
