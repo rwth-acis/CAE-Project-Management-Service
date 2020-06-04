@@ -17,13 +17,15 @@ docker build . -t cae-project-management-service
 Then you can run the image like this:
 
 ```bash
-docker run -e MYSQL_USER=myuser -e MYSQL_PASSWORD=mypasswd -p 8080:8080 -p 9011:9011 cae-project-management-service
+docker run -e MYSQL_USER=myuser -e MYSQL_PASSWORD=mypasswd -e GITHUB_USER=github_username -e GITHUB_PASSWORD=github_password -e GITHUB_ORGANIZATION=organization_name -p 8080:8080 -p 9011:9011 cae-project-management-service
 ```
 
 Replace *myuser* and *mypasswd* with the username and password of a MySQL user with access to a database named *commedit*.
 By default the database host is *mysql* and the port is *3306*.
 You can use --link option to connect the project management service with the MySQL docker container.
 Note, when using MYSQL_HOST env variable, it seems to be needed to also give the MYSQL_PORT even if it should be the standard one.
+By using the environment variables GITHUB_USER, GITHUB_PASSWORD and GITHUB_ORGANIZATION you can select which GitHub organization gets used for storing the GitHub projects that correspond to CAE projects.
+Note, that the user must be able to create projects inside the given organization.
 
 In order to customize your setup you can set further environment variables.
 
@@ -46,6 +48,9 @@ The las2peer port is fixed at *9011*.
 | MYSQL_PASSWORD | *mandatory* |
 | MYSQL_HOST | mysql |
 | MYSQL_PORT | 3306 |
+| GITHUB_USER | *mandatory* |
+| GITHUB_PASSWORD | *mandatory* |
+| GITHUB_ORGANIZATION | *mandatory* |
 
 ### Web Connector Variables
 
