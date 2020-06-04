@@ -22,6 +22,12 @@ export MYSQL_DATABASE='commedit'
     echo "Mandatory variable MYSQL_USER is not set. Add -e MYSQL_USER=myuser to your arguments." && exit 1
 [[ -z "${MYSQL_PASSWORD}" ]] && \
     echo "Mandatory variable MYSQL_PASSWORD is not set. Add -e MYSQL_PASSWORD=mypasswd to your arguments." && exit 1
+[[ -z "${GITHUB_USER}" ]] && \
+    echo "Mandatory variable GITHUB_USER is not set. Add -e GITHUB_USER=username to your arguments." && exit 1
+[[ -z "${GITHUB_PASSWORD}" ]] && \
+    echo "Mandatory variable GITHUB_PASSWORD is not set. Add -e GITHUB_PASSWORD=password to your arguments." && exit 1
+[[ -z "${GITHUB_ORGANIZATION}" ]] && \
+    echo "Mandatory variable GITHUB_ORGANIZATION is not set. Add -e GITHUB_ORGANIZATION=organization_name to your arguments." && exit 1
 
 # set defaults for optional service parameters
 [[ -z "${SERVICE_PASSPHRASE}" ]] && export SERVICE_PASSPHRASE='Passphrase'
@@ -47,6 +53,9 @@ set_in_service_config jdbcUrl "jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/"
 set_in_service_config jdbcSchema ${MYSQL_DATABASE}
 set_in_service_config jdbcLogin ${MYSQL_USER}
 set_in_service_config jdbcPass ${MYSQL_PASSWORD}
+set_in_service_config gitHubUser ${GITHUB_USER}
+set_in_service_config gitHubPassword ${GITHUB_PASSWORD}
+set_in_service_config gitHubOrganization ${GITHUB_ORGANIZATION}
 
 # configure web connector properties
 
