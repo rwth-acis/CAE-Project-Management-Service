@@ -794,6 +794,79 @@ public class RESTResources {
 	}
 	
 	/**
+	 * Removes the component with the given id from the project with the given id.
+	 * Therefore, the user sending the request needs to be a member of the project.
+	 * Note: Currently, the component will not be deleted, since it might be used as a dependency
+	 * somewhere else. Right now only the entry in the ProjectToComponent table gets removed.
+	 * TODO: When dependencies are included, then this method needs to be updated: Check if component
+	 * that should be deleted is used as a dependency somewhere. If not, then remove the component too 
+	 * (and not only the ProjectToComponent entry).
+	 * @param projectId Id of the project where the component should be removed from.
+	 * @param componentId Id of the component which should be removed from the project.
+	 * @return Response with status code (and possibly error message).
+	 */
+	@DELETE
+	@Path("/projects/{projectId}/components/{componentId}")
+	@ApiOperation(value = "Removes a component from a project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, removed component from project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to remove components from it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or component to remove from project could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response removeProjectComponent(@PathParam("projectId") int projectId, @PathParam("componentId") int componentId) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE,
+				"removeProjectComponent: trying to remove component with id " + componentId +
+				" from project with id " + projectId);
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			// check if user is allowed to remove a component from the project
+			Connection connection = null;
+			try {
+			    connection = dbm.getConnection();
+			    
+			    User user = authManager.getUser();
+			    
+			    // get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is allowed to remove components from the project
+			    	boolean removed = project.removeComponent(componentId, connection);
+		    		if(removed) {
+		    			// removed component successfully
+		    			return Response.ok().build();
+		    		} else {
+		    			// component is not included in the project
+		    	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+		    	    			.entity("Component with the given id could not be found in the project.").build();
+		    		}
+			    } else {
+			    	// user does not have the permission to remove components from the project
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to remove a component from it.").build();
+			    }
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	/**
 	 * Method for retrieving the currently active user.
 	 * @return Response with the currently active user as JSON string, or error code.
 	 */

@@ -520,7 +520,7 @@ public class Project {
 	 * Removes the user with the given id from the project.
 	 * @param userId Id of the user to remove.
 	 * @param connection Connection object
-	 * @return False, if user cannot be removed because he is no member of the project. True, if removed successfully.
+	 * @return False, if user cannot be removed because not being a member of the project. True, if removed successfully.
 	 * @throws SQLException If something with the database went wrong.
 	 */
 	public boolean removeUser(int userId, Connection connection) throws SQLException {
@@ -688,6 +688,40 @@ public class Project {
 	 */
 	public ArrayList<Component> getComponents() {
 		return components;
+	}
+	
+	/**
+	 * Checks if the list of components of the project contains 
+	 * a component with the given id.
+	 * @param componentId Id of the component to search for.
+	 * @return Whether the component is part of the project or not.
+	 */
+	public boolean hasComponent(int componentId) {
+		for(Component component : this.components) {
+			if(component.getId() == componentId) return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * Removes the component with the given id from the project.
+	 * @param componentId Id of the component which should be removed from the project.
+	 * @param connection Connection object
+	 * @return True, if component could be removed. False, if component is not included in project and thus could not be removed.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public boolean removeComponent(int componentId, Connection connection) throws SQLException {
+		if(!hasComponent(componentId)) return false;
+		
+		PreparedStatement statement = connection
+				.prepareStatement("DELETE FROM ProjectToComponent WHERE projectId = ? AND componentId = ?;");
+		statement.setInt(1, this.id);
+		statement.setInt(2, componentId);
+		
+		// execute update and close statement
+		statement.executeUpdate();
+		statement.close();
+		return true;
 	}
 	
 	/**
