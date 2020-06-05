@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS commedit.Project (
   reqBazProjectId INT,
   reqBazCategoryId INT,
   gitHubProjectId INT,
+  gitHubProjectHtmlUrl VARCHAR(255),
   name VARCHAR(255) NOT NULL,
   CONSTRAINT projectPK PRIMARY KEY (id)
 );

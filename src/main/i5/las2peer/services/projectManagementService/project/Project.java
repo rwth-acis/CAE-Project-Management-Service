@@ -19,6 +19,7 @@ import i5.las2peer.services.projectManagementService.exception.NoDefaultRoleFoun
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
 import i5.las2peer.services.projectManagementService.github.GitHubHelper;
+import i5.las2peer.services.projectManagementService.github.GitHubProject;
 
 /**
  * (Data-)Class for Projects. Provides means to convert JSON to Object and Object
@@ -66,9 +67,9 @@ public class Project {
     private int reqBazCategoryId;
     
     /**
-     * Id of the GitHub project which is connected to the CAE project.
+     * Information on the connected GitHub project.
      */
-    private int gitHubProjectId;
+    private GitHubProject gitHubProject;
     
     /**
      * Components that were created "by the project".
@@ -156,7 +157,7 @@ public class Project {
 		this.name = queryResult.getString("name");
 		this.reqBazProjectId = queryResult.getInt("reqBazProjectId");
 		this.reqBazCategoryId = queryResult.getInt("reqBazCategoryId");
-		this.gitHubProjectId = queryResult.getInt("gitHubProjectId");
+        this.gitHubProject = new GitHubProject(queryResult.getInt("gitHubProjectId"), queryResult.getString("gitHubProjectHtmlUrl"));
 		
 		// load roles
 		loadRoles(connection);
@@ -307,13 +308,16 @@ public class Project {
 			connection.setAutoCommit(false);
 			
 			// try to create GitHub project
-			int gitHubProjectId = GitHubHelper.getInstance().createPublicGitHubProject(this.name);
+			GitHubProject gitHubProject = GitHubHelper.getInstance().createPublicGitHubProject(this.name);
+			this.gitHubProject = gitHubProject;
 			
 			// formulate empty statement for storing the project
-			statement = connection.prepareStatement("INSERT INTO Project (name, gitHubProjectId) VALUES (?,?);", Statement.RETURN_GENERATED_KEYS);
-			// set name and GitHub project id of project
+			statement = connection
+					.prepareStatement("INSERT INTO Project (name, gitHubProjectId, gitHubProjectHtmlUrl) VALUES (?,?,?);", Statement.RETURN_GENERATED_KEYS);
+			// set name and GitHub project information of project
 			statement.setString(1, this.name);
-			statement.setInt(2, gitHubProjectId);
+			statement.setInt(2, gitHubProject.getId());
+			statement.setString(3, gitHubProject.getHtmlUrl());
 			// execute update
 			statement.executeUpdate();
 		    // get the generated project id and close statement
@@ -376,7 +380,10 @@ public class Project {
 		jsonProject.put("name", this.name);
 		jsonProject.put("reqBazProjectId", this.reqBazProjectId);
 		jsonProject.put("reqBazCategoryId", this.reqBazCategoryId);
-		jsonProject.put("gitHubProjectId", this.gitHubProjectId);
+		if(this.gitHubProject != null) {
+		    jsonProject.put("gitHubProjectId", this.gitHubProject.getId());
+		    jsonProject.put("gitHubProjectHtmlUrl", this.gitHubProject.getHtmlUrl());
+		}
 		
 		// put roles
 		JSONArray jsonRoles = new JSONArray();

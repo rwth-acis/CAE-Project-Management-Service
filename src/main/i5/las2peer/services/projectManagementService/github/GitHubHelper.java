@@ -67,26 +67,26 @@ public class GitHubHelper {
 	/**
 	 * Creates a public GitHub project with the given name.
 	 * @param projectName Name of the GitHub project which should be created.
-	 * @return Id of the newly created GitHub project.
+	 * @return The newly created GitHubProject object.
 	 * @throws GitHubException If something with the requests to the GitHub API went wrong.
 	 */
-	public int createPublicGitHubProject(String projectName) throws GitHubException {
+	public GitHubProject createPublicGitHubProject(String projectName) throws GitHubException {
 		if(gitHubUser == null || gitHubPassword == null || gitHubOrganization == null) {
 			throw new GitHubException("One of the variables user, password or organization are not set.");
 		}
 		
-		int gitHubProjectId = createGitHubProject(projectName);
-		makeGitHubProjectPublic(gitHubProjectId);
-		return gitHubProjectId;
+		GitHubProject gitHubProject = createGitHubProject(projectName);
+		makeGitHubProjectPublic(gitHubProject.getId());
+		return gitHubProject;
 	}
 
 	/**
 	 * Creates a GitHub project in the GitHub organization given by the properties file.
 	 * @param projectName Name of the GitHub project.
-	 * @return Id of the newly created GitHub project.
+	 * @return The newly created GitHubProject object.
 	 * @throws GitHubException If something with creating the new project went wrong.
 	 */
-	private int createGitHubProject(String projectName) throws GitHubException {
+	private GitHubProject createGitHubProject(String projectName) throws GitHubException {
 		String body = getGitHubProjectBody(projectName);
 		String authStringEnc = getAuthStringEnc();
 
@@ -117,7 +117,8 @@ public class GitHubHelper {
 				// convert to JSONObject
 				JSONObject json = (JSONObject) JSONValue.parseWithException(response);
 				int gitHubProjectId = ((Long) json.get("id")).intValue();
-				return gitHubProjectId;
+				String gitHubProjectHtmlUrl = (String) json.get("html_url");
+				return new GitHubProject(gitHubProjectId, gitHubProjectHtmlUrl);
 			}
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
