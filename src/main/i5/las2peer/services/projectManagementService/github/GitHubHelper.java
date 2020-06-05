@@ -77,6 +77,12 @@ public class GitHubHelper {
 		
 		GitHubProject gitHubProject = createGitHubProject(projectName);
 		makeGitHubProjectPublic(gitHubProject.getId());
+		
+		// create some predefined columns
+		createProjectColumn(gitHubProject.getId(), "To do");
+		createProjectColumn(gitHubProject.getId(), "In progress");
+		createProjectColumn(gitHubProject.getId(), "Done");
+		
 		return gitHubProject;
 	}
 
@@ -171,6 +177,58 @@ public class GitHubHelper {
 			e.printStackTrace();
 			throw new GitHubException(e.getMessage());
 		}
+	}
+	
+	/**
+	 * Creates a new column with the given name in the GitHub project with the given id.
+	 * @param gitHubProjectId Id of the GitHub project, where the column should be added to.
+	 * @param columnName Name of the column, which should be created.
+	 * @throws GitHubException If something with the request to the GitHub API went wrong.
+	 */
+	private void createProjectColumn(int gitHubProjectId, String columnName) throws GitHubException {
+		String body = getCreateColumnBody(columnName);
+		String authStringEnc = getAuthStringEnc();
+
+		URL url;
+		try {
+			url = new URL(API_BASE_URL + "/projects/" + gitHubProjectId + "/columns");
+
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("POST");
+			connection.setDoInput(true);
+			connection.setDoOutput(true);
+			connection.setUseCaches(false);
+			connection.setRequestProperty("Accept", "application/vnd.github.inertia-preview+json");
+			connection.setRequestProperty("Content-Type", "application/json");
+			connection.setRequestProperty("Content-Length", String.valueOf(body.length()));
+			connection.setRequestProperty("Authorization", "Basic " + authStringEnc);
+
+			writeRequestBody(connection, body);
+			
+			// forward (in case of) error
+			if (connection.getResponseCode() != 201) {
+				String message = getErrorMessage(connection);
+				throw new GitHubException(message);
+			}
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		}
+	}
+	
+	/**
+	 * Creates the body needed to create a new column in a GitHub project.
+	 * @param columnName Name of the column that should be created.
+	 * @return Body as string.
+	 */
+	private String getCreateColumnBody(String columnName) {
+		JSONObject jsonObject = new JSONObject();
+		jsonObject.put("name", columnName);
+		String body = JSONObject.toJSONString(jsonObject);
+		return body;
 	}
 	
 	/**
