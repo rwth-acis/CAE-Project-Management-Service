@@ -407,6 +407,13 @@ public class Project {
 			jsonUsers.add(jsonUser);
 		}
 		jsonProject.put("users", jsonUsers);
+		
+		// put components
+		JSONArray jsonComponents = new JSONArray();
+		for(Component component : components) {
+			jsonComponents.add(component.toJSONObject());
+		}
+		jsonProject.put("components", jsonComponents);
 
 		return jsonProject;
 	}
