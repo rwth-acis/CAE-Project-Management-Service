@@ -14,6 +14,7 @@ import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
 import i5.las2peer.services.projectManagementService.component.Component;
+import i5.las2peer.services.projectManagementService.component.ComponentType;
 import i5.las2peer.services.projectManagementService.exception.GitHubException;
 import i5.las2peer.services.projectManagementService.exception.NoDefaultRoleFoundException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
@@ -332,6 +333,9 @@ public class Project {
 			// store users (must be done after storing roles, because default role needs to be persisted)
 			persistUsers(connection);
 			
+			// store empty application model (which gets used by the project)
+			createApplicationComponent(connection);
+			
 			// no errors occurred, so commit
 			connection.commit();
 		} catch (SQLException e) {
@@ -342,6 +346,23 @@ public class Project {
 			// reset auto commit to previous value
 			connection.setAutoCommit(autoCommitBefore);
 		}
+	}
+	
+	/**
+	 * Stores an application component for the project in the database.
+	 * Every projects needs exactly one application component/model.
+	 * Thus, every new component gets one empty application component/model.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	private void createApplicationComponent(Connection connection) throws SQLException {
+		String applicationComponentName = this.name + "-application";
+		Component applicationComponent = new Component(applicationComponentName, ComponentType.APPLICATION);
+		applicationComponent.persist(this, connection);
+		
+		// also add the new component to the components list
+		// otherwise it wont be included in the response of the POST project request
+		this.components.add(applicationComponent);
 	}
 	
 	private void persistUsers(Connection connection) throws SQLException {

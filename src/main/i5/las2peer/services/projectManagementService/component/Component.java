@@ -52,6 +52,18 @@ public class Component {
 	}
 	
 	/**
+	 * Constructor used when creating a totally new component, which is 
+	 * not yet stored in the database. This constructor gets used internally
+	 * when creating the empty application component for a new project.
+	 * @param name Name of the component that should get created.
+	 * @param type Type of the component that should get created.
+	 */
+	public Component(String name, ComponentType type) {
+		this.name = name;
+		this.type = type;
+	}
+	
+	/**
 	 * Sets the ComponentType to the type given as a string.
 	 * @param typeStr Type of the component as string.
 	 * @throws ParseException If type does not match the format.
