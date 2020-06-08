@@ -56,18 +56,6 @@ public class Project {
     private HashMap<User, Role> roleAssignment;
     
     /**
-     * Project id of the project in the Requirements Bazaar which is linked
-     * to this CAE project.
-     */
-    private int reqBazProjectId;
-    
-    /**
-     * Category id of the category in the Requirements Bazaar which is linked
-     * to this CAE project.
-     */
-    private int reqBazCategoryId;
-    
-    /**
      * Information on the connected GitHub project.
      */
     private GitHubProject gitHubProject;
@@ -156,8 +144,6 @@ public class Project {
 	private void setAttributesFromQueryResult(ResultSet queryResult, Connection connection) throws SQLException {
 		this.id = queryResult.getInt("id");
 		this.name = queryResult.getString("name");
-		this.reqBazProjectId = queryResult.getInt("reqBazProjectId");
-		this.reqBazCategoryId = queryResult.getInt("reqBazCategoryId");
         this.gitHubProject = new GitHubProject(queryResult.getInt("gitHubProjectId"), queryResult.getString("gitHubProjectHtmlUrl"));
 		
 		// load roles
@@ -399,8 +385,6 @@ public class Project {
 		// put attributes
 		jsonProject.put("id", this.id);
 		jsonProject.put("name", this.name);
-		jsonProject.put("reqBazProjectId", this.reqBazProjectId);
-		jsonProject.put("reqBazCategoryId", this.reqBazCategoryId);
 		if(this.gitHubProject != null) {
 		    jsonProject.put("gitHubProjectId", this.gitHubProject.getId());
 		    jsonProject.put("gitHubProjectHtmlUrl", this.gitHubProject.getHtmlUrl());
@@ -669,40 +653,6 @@ public class Project {
     		jsonProjects.add(p.toJSONObject());
     	}
     	return jsonProjects;
-	}
-	
-	/**
-	 * Updates the Requirements Bazaar config in the database.
-	 * @param reqBazProjectId ProjectId of the project in the Requirements Bazaar.
-	 * @param reqBazCategoryId CategoryId of the category in the Requirements Bazaar.
-	 * @param connection Connection object
-	 * @throws SQLException If something with the database went wrong.
-	 */
-	public void updateRequirementsBazaarConfig(int reqBazProjectId, int reqBazCategoryId, Connection connection) throws SQLException {
-		PreparedStatement statement = connection
-				.prepareStatement("UPDATE Project SET reqBazProjectId = ?, reqBazCategoryId = ? WHERE id = ?;");
-		statement.setInt(1, reqBazProjectId);
-		statement.setInt(2, reqBazCategoryId);
-		statement.setInt(3, this.id);
-		
-		// execute update
-		statement.executeUpdate();
-		statement.close();
-	}
-	
-	/**
-	 * Disconnects the CAE project from the Requirements Bazaar project in the database.
-	 * @param connection Connection object
-	 * @throws SQLException If something with the database went wrong.
-	 */
-	public void disconnectRequirementsBazaar(Connection connection) throws SQLException {
-		PreparedStatement statement = connection
-				.prepareStatement("UPDATE Project SET reqBazProjectId = NULL, reqBazCategoryId = NULL WHERE id = ?;");
-		statement.setInt(1, this.id);
-		
-		// execute update
-		statement.executeUpdate();
-		statement.close();
 	}
 	
 	/**
