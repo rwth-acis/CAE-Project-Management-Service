@@ -70,6 +70,8 @@ CREATE TABLE IF NOT EXISTS commedit.Component (
   name VARCHAR(255) NOT NULL,
   type VARCHAR(255) NOT NULL,
   versionedModelId INT NOT NULL,
+  reqBazProjectId INT,
+  reqBazCategoryId INT,
   CONSTRAINT componentPK PRIMARY KEY (id),
   CONSTRAINT componentVersionedModelFK FOREIGN KEY (versionedModelId) REFERENCES commedit.VersionedModel(id) ON DELETE CASCADE
 );

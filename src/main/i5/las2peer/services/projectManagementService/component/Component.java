@@ -10,7 +10,10 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
+import i5.las2peer.services.projectManagementService.exception.ReqBazException;
 import i5.las2peer.services.projectManagementService.project.Project;
+import i5.las2peer.services.projectManagementService.reqbaz.ReqBazCategory;
+import i5.las2peer.services.projectManagementService.reqbaz.ReqBazHelper;
 
 public class Component {
 	
@@ -29,6 +32,11 @@ public class Component {
 	 * Type of the component.
 	 */
 	private ComponentType type;
+	
+	/**
+	 * The connected category in the Requirements Bazaar.
+	 */
+	private ReqBazCategory reqBazCategory;
 	
 	/**
 	 * Id of the versioned model which is connected to the component.
@@ -101,7 +109,7 @@ public class Component {
 	 * Creates a component by loading it from the database.
 	 * @param componentId Id of the component to search for.
 	 * @param connection Connection object
-	 * @throws SQLException If somethin with the database went wrong.
+	 * @throws SQLException If something with the database went wrong.
 	 * @throws ParseException If the stored component type does not match the format.
 	 */
 	public Component(int componentId, Connection connection) throws SQLException, ParseException {
@@ -116,6 +124,10 @@ public class Component {
 			this.name = queryResult.getString("name");
 			setType(queryResult.getString("type"));
 			this.versionedModelId = queryResult.getInt("versionedModelId");
+			
+			int reqBazProjectId = queryResult.getInt("reqBazProjectId");
+			int reqBazCategoryId = queryResult.getInt("reqBazCategoryId");
+			this.reqBazCategory = new ReqBazCategory(reqBazCategoryId, reqBazProjectId);
 		}
 		statement.close();
 	}
@@ -125,8 +137,9 @@ public class Component {
 	 * @param project Project which is the owner of the component.
 	 * @param connection Connection object
 	 * @throws SQLException If something with the database went wrong.
+	 * @throws ReqBazException If something with creating the Requirements Bazaar category went wrong.
 	 */
-	public void persist(Project project, Connection connection) throws SQLException {
+	public void persist(Project project, Connection connection) throws SQLException, ReqBazException {
 		boolean autoCommitBefore = connection.getAutoCommit();
 		try {
 			connection.setAutoCommit(false);
@@ -134,12 +147,18 @@ public class Component {
 			// create empty versioned model
 			this.versionedModelId = ComponentInitHelper.createEmptyVersionedModel(connection);
 			
+			// create category in requirements bazaar
+			String categoryName = project.getId() + "-" + this.name;
+			this.reqBazCategory = ReqBazHelper.getInstance().createCategory(categoryName);
+			
 			// create component
 		    PreparedStatement statement = connection
-			    	.prepareStatement("INSERT INTO Component (name, type, versionedModelId) VALUES (?,?,?);", Statement.RETURN_GENERATED_KEYS);
+			    	.prepareStatement("INSERT INTO Component (name, type, versionedModelId, reqBazProjectId, reqBazCategoryId) VALUES (?,?,?,?,?);", Statement.RETURN_GENERATED_KEYS);
 		    statement.setString(1, this.name);
 		    statement.setString(2, typeToString());
 		    statement.setInt(3, versionedModelId);
+		    statement.setInt(4, this.reqBazCategory.getProjectId());
+		    statement.setInt(5, this.reqBazCategory.getId());
 		
 		    // execute update
 		    statement.executeUpdate();
@@ -174,6 +193,10 @@ public class Component {
 		jsonComponent.put("name", this.name);
 		jsonComponent.put("type", typeToString());
 		jsonComponent.put("versionedModelId", this.versionedModelId);
+		if(this.reqBazCategory != null) {
+			jsonComponent.put("reqBazProjectId", this.reqBazCategory.getProjectId());
+			jsonComponent.put("reqBazCategoryId", this.reqBazCategory.getId());
+		}
 		
 		return jsonComponent;
 	}

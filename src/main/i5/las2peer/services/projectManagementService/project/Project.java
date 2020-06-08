@@ -18,6 +18,7 @@ import i5.las2peer.services.projectManagementService.component.ComponentType;
 import i5.las2peer.services.projectManagementService.exception.GitHubException;
 import i5.las2peer.services.projectManagementService.exception.NoDefaultRoleFoundException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
+import i5.las2peer.services.projectManagementService.exception.ReqBazException;
 import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
 import i5.las2peer.services.projectManagementService.github.GitHubHelper;
 import i5.las2peer.services.projectManagementService.github.GitHubProject;
@@ -286,8 +287,9 @@ public class Project {
 	 * @param connection a Connection Object
 	 * @throws SQLException if something with the database has gone wrong
 	 * @throws GitHubException If something went wrong while creating GitHub project.
+	 * @throws ReqBazException If something went wrong while creating the Requirements Bazaar category for the application component.
 	 */
-	public void persist(Connection connection) throws SQLException, GitHubException {
+	public void persist(Connection connection) throws SQLException, GitHubException, ReqBazException {
 		PreparedStatement statement;
 		// store current value of auto commit
 		boolean autoCommitBefore = connection.getAutoCommit();
@@ -324,6 +326,10 @@ public class Project {
 			
 			// no errors occurred, so commit
 			connection.commit();
+		} catch (ReqBazException e) {
+			// roll back the whole stuff
+			connection.rollback();
+			throw e;
 		} catch (SQLException e) {
 			// roll back the whole stuff
 			connection.rollback();
@@ -340,8 +346,9 @@ public class Project {
 	 * Thus, every new component gets one empty application component/model.
 	 * @param connection Connection object
 	 * @throws SQLException If something with the database went wrong.
+	 * @throws ReqBazException If something with creating the Requirements Bazaar category went wrong.
 	 */
-	private void createApplicationComponent(Connection connection) throws SQLException {
+	private void createApplicationComponent(Connection connection) throws SQLException, ReqBazException {
 		String applicationComponentName = this.name + "-application";
 		Component applicationComponent = new Component(applicationComponentName, ComponentType.APPLICATION);
 		applicationComponent.persist(this, connection);

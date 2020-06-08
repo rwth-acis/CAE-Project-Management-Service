@@ -4,6 +4,7 @@ import i5.las2peer.restMapper.RESTService;
 import i5.las2peer.restMapper.annotations.ServicePath;
 import i5.las2peer.services.projectManagementService.database.DatabaseManager;
 import i5.las2peer.services.projectManagementService.github.GitHubHelper;
+import i5.las2peer.services.projectManagementService.reqbaz.ReqBazHelper;
 import i5.las2peer.api.ManualDeployment;
 
 /**
@@ -33,6 +34,12 @@ public class ProjectManagementService extends RESTService {
 	private String gitHubPassword;
 	private String gitHubOrganization;
 	
+	/*
+	 * Requirements Bazaar configuration.
+	 */
+	private String reqBazBackendUrl;
+	private int reqBazProjectId;
+	
 	public ProjectManagementService() {
 		// read and set properties values
 		setFieldValues();
@@ -45,6 +52,11 @@ public class ProjectManagementService extends RESTService {
 		gitHubHelper.setGitHubUser(this.gitHubUser);
 		gitHubHelper.setGitHubPassword(this.gitHubPassword);
 		gitHubHelper.setGitHubOrganization(this.gitHubOrganization);
+		
+		// setup ReqBazHelper
+		ReqBazHelper reqBazHelper = ReqBazHelper.getInstance();
+		reqBazHelper.setReqBazBackendUrl(this.reqBazBackendUrl);
+		reqBazHelper.setReqBazProjectId(this.reqBazProjectId);
 	}
 	
 	@Override

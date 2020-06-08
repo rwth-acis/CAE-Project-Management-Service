@@ -25,6 +25,7 @@ import i5.las2peer.services.projectManagementService.component.Component;
 import i5.las2peer.services.projectManagementService.database.DatabaseManager;
 import i5.las2peer.services.projectManagementService.exception.GitHubException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
+import i5.las2peer.services.projectManagementService.exception.ReqBazException;
 import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.UserNotFoundException;
 import i5.las2peer.services.projectManagementService.project.Project;
@@ -132,6 +133,10 @@ public class RESTResources {
 				logger.printStackTrace(e);
 				return Response.serverError()
 						.entity("Internal server error: An error occurred while creating the connected GitHub project.").build();
+			} catch (ReqBazException e) {
+				logger.printStackTrace(e);
+				return Response.serverError()
+						.entity("Internal server error: An error occurred while creating the Requirements Bazaar category for the application component.").build();
 			} finally {
 				try {
 					if(connection != null) connection.close();
@@ -606,6 +611,10 @@ public class RESTResources {
             } catch (ParseException e) {
 				logger.printStackTrace(e);
 				return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
+			} catch (ReqBazException e) {
+				logger.printStackTrace(e);
+				return Response.serverError()
+						.entity("Internal server error: Could not create Requirements Bazaar category for component.").build();
 			} finally {
 				try {
 					if(connection != null) connection.close();
