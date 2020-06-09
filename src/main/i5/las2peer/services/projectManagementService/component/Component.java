@@ -147,18 +147,25 @@ public class Component {
 			// create empty versioned model
 			this.versionedModelId = ComponentInitHelper.createEmptyVersionedModel(connection);
 			
+			// TODO: currently no req baz category gets created
 			// create category in requirements bazaar
-			String categoryName = project.getId() + "-" + this.name;
-			this.reqBazCategory = ReqBazHelper.getInstance().createCategory(categoryName);
+			//String categoryName = project.getId() + "-" + this.name;
+			//this.reqBazCategory = ReqBazHelper.getInstance().createCategory(categoryName);
 			
 			// create component
-		    PreparedStatement statement = connection
+		    /*PreparedStatement statement = connection
 			    	.prepareStatement("INSERT INTO Component (name, type, versionedModelId, reqBazProjectId, reqBazCategoryId) VALUES (?,?,?,?,?);", Statement.RETURN_GENERATED_KEYS);
 		    statement.setString(1, this.name);
 		    statement.setString(2, typeToString());
 		    statement.setInt(3, versionedModelId);
 		    statement.setInt(4, this.reqBazCategory.getProjectId());
-		    statement.setInt(5, this.reqBazCategory.getId());
+		    statement.setInt(5, this.reqBazCategory.getId());*/
+			
+			PreparedStatement statement = connection
+	    	        .prepareStatement("INSERT INTO Component (name, type, versionedModelId) VALUES (?,?,?);", Statement.RETURN_GENERATED_KEYS);
+            statement.setString(1, this.name);
+            statement.setString(2, typeToString());
+            statement.setInt(3, versionedModelId);
 		
 		    // execute update
 		    statement.executeUpdate();
