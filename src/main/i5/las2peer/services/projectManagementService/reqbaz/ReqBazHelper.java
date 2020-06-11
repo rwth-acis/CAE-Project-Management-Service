@@ -46,18 +46,19 @@ public class ReqBazHelper {
 	/**
 	 * Creates a new category in the Requirements Bazaar.
 	 * @param categoryName Name of the category that should be created.
+	 * @param accessToken The OIDC access token which should be used to create the Requirements Bazaar category.
 	 * @return ReqBazCategory object.
 	 * @throws ReqBazException If something with the API request went wrong.
 	 */
-	public ReqBazCategory createCategory(String categoryName) throws ReqBazException {
+	public ReqBazCategory createCategory(String categoryName, String accessToken) throws ReqBazException {
 		if(reqBazBackendUrl == null || reqBazProjectId == -1) {
 			throw new ReqBazException("One of the variables reqBazBackendUrl or reqBazProjectId are not set.");
 		}
 		
 		String body = getCategoryBody(categoryName);
 		
-		// TODO: get real oidc token
-		String oidcToken = "TODO";
+		// this is the access token from the user that wants to create the project
+		String oidcToken = accessToken;
 		
 		URL url;
 		try {

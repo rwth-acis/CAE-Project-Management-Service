@@ -9,7 +9,6 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -84,7 +83,7 @@ public class RESTResources {
 	 * Therefore, the user needs to be authorized.
 	 * First, checks if a project with the given name already exists.
 	 * If not, then the new project gets stored into the database.
-	 * @param inputProject JSON representation of the project to store.
+	 * @param inputProject JSON representation of the project to store (containing name and access token of user needed to create Requirements Bazaar category).
 	 * @return Response containing the status code (and a message or the created project).
 	 */
 	@POST
@@ -95,7 +94,7 @@ public class RESTResources {
 			@ApiResponse(code = HttpURLConnection.HTTP_CREATED, message = "OK, project created."),
 			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
 			@ApiResponse(code = HttpURLConnection.HTTP_CONFLICT, message = "There already exists a project with the given name."),
-			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Input project is not well formatted."),
+			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Input project is not well formatted or some attribute is missing."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
 	public Response postProject(String inputProject) {
@@ -118,10 +117,20 @@ public class RESTResources {
 				    return Response.status(HttpURLConnection.HTTP_CONFLICT).entity("A project with the given name already exists.").build();
 			    } catch (ProjectNotFoundException e) {
 			    	// project does not exist yet
-			    	// persist method also stores users of the project (only the creator for now) etc.
-			    	project.persist(connection);
-			    	
-					return Response.status(HttpURLConnection.HTTP_CREATED).entity(project.toJSONObject().toJSONString()).build();
+			    	// extract access token from inputProject
+			    	JSONObject json = (JSONObject) JSONValue.parse(inputProject);
+			    	if(json.containsKey("access_token")) {
+			    		String accessToken = (String) json.get("access_token");
+			    		
+			    		// persist method also stores users of the project (only the creator for now) etc.
+				    	project.persist(connection, accessToken);
+				    	
+						return Response.status(HttpURLConnection.HTTP_CREATED).entity(project.toJSONObject().toJSONString()).build();
+			    	} else {
+			    		logger.printStackTrace(e);
+						return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+								.entity("Input project has no attribute 'access_token' which is needed.").build();
+			    	}
 			    }
 			} catch (SQLException e) {
 				logger.printStackTrace(e);
@@ -565,7 +574,7 @@ public class RESTResources {
 	/**
 	 * Adds a component to a project.
 	 * @param projectId Id of the project where a component should be added to.
-	 * @param inputComponent JSON representation of the component to add to the project.
+	 * @param inputComponent JSON representation of the component to add to the project (must contain access token of user).
 	 * @return Response with status code (and possibly an error description).
 	 */
 	@POST
@@ -599,11 +608,21 @@ public class RESTResources {
 			    if(project.hasUser(user.getId(), connection)) {
 			    	// user is member of the project and thus allowed to add components to it
 			    	Component component = new Component(inputComponent);
-			    	// persist component
-			    	component.persist(project, connection);
 			    	
-			    	// send component as result
-			    	return Response.ok(component.toJSONObject().toJSONString()).build();
+			    	// get access token from 
+			    	JSONObject json = (JSONObject) JSONValue.parse(inputComponent);
+			    	if(json.containsKey("access_token")) {
+			    		String accessToken = (String) json.get("access_token");
+			    		
+			    		// persist component
+				    	component.persist(project, connection, accessToken);
+				    	
+				    	// send component as result
+				    	return Response.ok(component.toJSONObject().toJSONString()).build();
+			    	} else {
+						return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+								.entity("Attribute 'access_token' is missing.").build();
+			    	}
 			    } else {
 			    	// user is no member of the project and thus not allowed to add components to it
 			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)

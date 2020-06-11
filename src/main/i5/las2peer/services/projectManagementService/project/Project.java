@@ -285,11 +285,12 @@ public class Project {
 	/**
 	 * Persists a project.
 	 * @param connection a Connection Object
+	 * @param accessToken OIDC access token which gets used to create the Requirements Bazaar category for the application component of the project.
 	 * @throws SQLException if something with the database has gone wrong
 	 * @throws GitHubException If something went wrong while creating GitHub project.
 	 * @throws ReqBazException If something went wrong while creating the Requirements Bazaar category for the application component.
 	 */
-	public void persist(Connection connection) throws SQLException, GitHubException, ReqBazException {
+	public void persist(Connection connection, String accessToken) throws SQLException, GitHubException, ReqBazException {
 		PreparedStatement statement;
 		// store current value of auto commit
 		boolean autoCommitBefore = connection.getAutoCommit();
@@ -322,7 +323,7 @@ public class Project {
 			persistUsers(connection);
 			
 			// store empty application model (which gets used by the project)
-			createApplicationComponent(connection);
+			createApplicationComponent(connection, accessToken);
 			
 			// no errors occurred, so commit
 			connection.commit();
@@ -345,13 +346,14 @@ public class Project {
 	 * Every projects needs exactly one application component/model.
 	 * Thus, every new component gets one empty application component/model.
 	 * @param connection Connection object
+	 * @param accessToken OIDC access token used to create the Requirements Bazaar category for the component.
 	 * @throws SQLException If something with the database went wrong.
 	 * @throws ReqBazException If something with creating the Requirements Bazaar category went wrong.
 	 */
-	private void createApplicationComponent(Connection connection) throws SQLException, ReqBazException {
+	private void createApplicationComponent(Connection connection, String accessToken) throws SQLException, ReqBazException {
 		String applicationComponentName = this.name + "-application";
 		Component applicationComponent = new Component(applicationComponentName, ComponentType.APPLICATION);
-		applicationComponent.persist(this, connection);
+		applicationComponent.persist(this, connection, accessToken);
 		
 		// also add the new component to the components list
 		// otherwise it wont be included in the response of the POST project request

@@ -136,10 +136,11 @@ public class Component {
 	 * Persists a component. Also creates an empty versioned model.
 	 * @param project Project which is the owner of the component.
 	 * @param connection Connection object
+	 * @param accessToken OIDC access token which should be used to create the Requirements Bazaar category.
 	 * @throws SQLException If something with the database went wrong.
 	 * @throws ReqBazException If something with creating the Requirements Bazaar category went wrong.
 	 */
-	public void persist(Project project, Connection connection) throws SQLException, ReqBazException {
+	public void persist(Project project, Connection connection, String accessToken) throws SQLException, ReqBazException {
 		boolean autoCommitBefore = connection.getAutoCommit();
 		try {
 			connection.setAutoCommit(false);
@@ -147,25 +148,18 @@ public class Component {
 			// create empty versioned model
 			this.versionedModelId = ComponentInitHelper.createEmptyVersionedModel(connection);
 			
-			// TODO: currently no req baz category gets created
 			// create category in requirements bazaar
-			//String categoryName = project.getId() + "-" + this.name;
-			//this.reqBazCategory = ReqBazHelper.getInstance().createCategory(categoryName);
+			String categoryName = project.getId() + "-" + this.name;
+			this.reqBazCategory = ReqBazHelper.getInstance().createCategory(categoryName, accessToken);
 			
 			// create component
-		    /*PreparedStatement statement = connection
+		    PreparedStatement statement = connection
 			    	.prepareStatement("INSERT INTO Component (name, type, versionedModelId, reqBazProjectId, reqBazCategoryId) VALUES (?,?,?,?,?);", Statement.RETURN_GENERATED_KEYS);
 		    statement.setString(1, this.name);
 		    statement.setString(2, typeToString());
 		    statement.setInt(3, versionedModelId);
 		    statement.setInt(4, this.reqBazCategory.getProjectId());
-		    statement.setInt(5, this.reqBazCategory.getId());*/
-			
-			PreparedStatement statement = connection
-	    	        .prepareStatement("INSERT INTO Component (name, type, versionedModelId) VALUES (?,?,?);", Statement.RETURN_GENERATED_KEYS);
-            statement.setString(1, this.name);
-            statement.setString(2, typeToString());
-            statement.setInt(3, versionedModelId);
+		    statement.setInt(5, this.reqBazCategory.getId());
 		
 		    // execute update
 		    statement.executeUpdate();
