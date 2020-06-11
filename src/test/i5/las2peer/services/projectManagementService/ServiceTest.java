@@ -226,7 +226,8 @@ public class ServiceTest {
 			// first test without auth
 			System.out.println("1. Test without auth");
 			ClientResponse result = client.sendRequest("GET", mainPath + "projects", "", MediaType.APPLICATION_JSON, "", new HashMap<>());
-			assertEquals(401, result.getHttpCode());
+			// without auth, all projects should be returned
+			assertEquals(200, result.getHttpCode());
 			System.out.println("Result of 'testGetProjects' without auth: " + result.getResponse().trim());
 			System.out.println();
 			

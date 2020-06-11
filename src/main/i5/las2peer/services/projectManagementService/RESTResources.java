@@ -149,47 +149,54 @@ public class RESTResources {
 	}
 	
 	/**
-	 * Searches for the project that the user is part of.
-	 * Therefore, the user needs to be authorized.
+	 * The result of requests to this endpoint depend on whether the user sending the 
+	 * request is anonymous or not.
+	 * 1. If the user sending the request is anonymous, then all projects are returned.
+	 * 2. If the user sending the request is not anonymous, then the projects by the
+	 * user / the projects where the user is a member of are returned.
 	 * @return Response containing the status code (and a message or project list).
 	 */
 	@GET
 	@Path("/projects")
 	@Consumes(MediaType.APPLICATION_JSON)
-	@ApiOperation(value = "Searches for the project that the user is part of.")
+	@ApiOperation(value = "When sending anonymous: Returns all projects. Otherwise searches for projects that the user is part of.")
 	@ApiResponses(value = {
 			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, list of users projects is returned."),
-			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
 	public Response getProjectsByUser() {
-		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProjectsByUser: searching for users projects");
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProjectsByUser: searching for projects");
 		
-		if(authManager.isAnonymous()) {
-			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).entity("User not authorized.").build();
-		} else {
-			Connection connection = null;
-            try {
-            	// first get current user from database
+		Connection connection = null;
+		try {
+			connection = dbm.getConnection();
+			
+			ArrayList<Project> projects;
+			
+			if(authManager.isAnonymous()) {
+				// load all projects from database
+				// when searching for projects with empty name, then every project should be found
+				// because it gets searched for name LIKE "%%"
+				projects = Project.searchProjects("", connection);
+			} else {
+				// first get current user from database
             	// the id of the user will be needed later
             	User user = authManager.getUser();
             	
-            	connection = dbm.getConnection();
             	// get all projects where the user is part of
-            	ArrayList<Project> projects = Project.getProjectsByUser(user.getId(), connection);
-            	
-            	// return JSONArray as string
-            	return Response.ok(Project.projectListToJSONArray(projects).toJSONString()).build();
-            } catch (SQLException e) {
-            	logger.printStackTrace(e);
-            	return Response.serverError().entity("Internal server error.").build();
-            } finally {
-				try {
-					if(connection != null) connection.close();
-				} catch (SQLException e) {
-					logger.printStackTrace(e);
-					return Response.serverError().entity("Internal server error.").build();
-				}
+            	projects = Project.getProjectsByUser(user.getId(), connection);
+			}
+			// return JSONArray as string
+        	return Response.ok(Project.projectListToJSONArray(projects).toJSONString()).build();
+		} catch (SQLException e) {
+        	logger.printStackTrace(e);
+        	return Response.serverError().entity("Internal server error.").build();
+        } finally {
+			try {
+				if(connection != null) connection.close();
+			} catch (SQLException e) {
+				logger.printStackTrace(e);
+				return Response.serverError().entity("Internal server error.").build();
 			}
 		}
 	}
