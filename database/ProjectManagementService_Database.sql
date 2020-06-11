@@ -87,3 +87,15 @@ CREATE TABLE IF NOT EXISTS commedit.ProjectToComponent (
   CONSTRAINT projectToComponentProjectFK FOREIGN KEY (projectId) REFERENCES commedit.Project(id) ON DELETE CASCADE,
   CONSTRAINT projectToComponentComponentFK FOREIGN KEY (componentId) REFERENCES commedit.Component(id) ON DELETE CASCADE
 );
+
+--
+-- Table structure for table ProjectInvitation.
+--
+CREATE TABLE IF NOT EXISTS commedit.ProjectInvitation (
+  id INT NOT NULL AUTO_INCREMENT,
+  projectId INT NOT NULL,
+  userId INT NOT NULL,
+  CONSTRAINT projectInvitationPK PRIMARY KEY (id),
+  CONSTRAINT projectInvitationProjectFK FOREIGN KEY (projectId) REFERENCES commedit.Project(id) ON DELETE CASCADE,
+  CONSTRAINT projectInvitationUserFK FOREIGN KEY (userId) REFERENCES commedit.User(id) ON DELETE CASCADE
+);

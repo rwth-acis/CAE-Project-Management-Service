@@ -28,6 +28,7 @@ import i5.las2peer.services.projectManagementService.exception.ReqBazException;
 import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.UserNotFoundException;
 import i5.las2peer.services.projectManagementService.project.Project;
+import i5.las2peer.services.projectManagementService.project.ProjectInvitation;
 import i5.las2peer.services.projectManagementService.project.Role;
 import i5.las2peer.services.projectManagementService.project.User;
 import io.swagger.annotations.Api;
@@ -774,6 +775,148 @@ public class RESTResources {
 			}
 		}
 	}
+	
+	/**
+	 * Invites a user to a project.
+	 * @param projectId Id of the project where a user should be invited to.
+	 * @param inputUser JSON containing the loginName of the user that should be invited.
+	 * @return Reponse with status code (and possibly error message).
+	 */
+	@POST
+	@Path("/projects/{projectId}/invitations")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Creates a new invitation to a project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, invited user to project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to invite others to it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or user to invite to project could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_CONFLICT, message = "User is already member of the project or is already invited to it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response postInvitation(@PathParam("projectId") int projectId, String inputUser) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "postInvitation: posting an invitation to project with id " + projectId);
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			// check if user is allowed to add a user to the project
+			Connection connection = null;
+		    try {
+			    connection = dbm.getConnection();
+			
+			    // get user sending the request
+				User user = authManager.getUser();
+				
+				// get project, where a user should be invited to
+				Project project = new Project(projectId, connection);
+				
+				if(project.hasUser(user.getId(), connection)) {
+				    // user is part of the project and thus is allowed to invite others to it
+					// get user that should be invited
+					// extract name of the user given in the request body (as json)
+			    	JSONObject jsonUserToInvite = (JSONObject) JSONValue.parseWithException(inputUser);
+			    	    
+			    	if(jsonUserToInvite.containsKey("loginName")) {
+			    	    String userToInviteLoginName = (String) jsonUserToInvite.get("loginName");
+			    	    	
+			    	    User userToInvite = User.loadUserByLoginName(userToInviteLoginName, connection);
+			    	    
+			    	    // check if the user is already member of the project
+			    	    // then an invitation does not make any sense
+			    	    if(project.hasUser(userToInvite.getId(), connection)) {
+			    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
+			    	    			.entity("User cannot be invited, because user is already member of the project.").build();
+			    	    }
+			    	    
+			    	    // check if an invitation already exists
+			    	    // then another invitation would not make any sense
+			    	    if(ProjectInvitation.exists(projectId, userToInvite.getId(), connection)) {
+			    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
+			    	    			.entity("User is already invited to the project.").build();
+			    	    }
+			    	    
+			    	    // create invitation
+			    	    ProjectInvitation inv = new ProjectInvitation(projectId, userToInvite.getId());
+			    	    inv.persist(connection);
+			    	    
+			    	    return Response.ok().build();
+			    	} else {
+			    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+			    				.entity("Attribute 'loginName' is missing.").build();
+			    	}
+				} else {
+					// user does not have the permission to invite others to the project
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to invite others to it.").build();
+				}
+				
+		    } catch (UserNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("User with the given loginName could not be found.").build();
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } catch (ParseException e) {
+            	logger.printStackTrace(e);
+				return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).build();
+			} finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Returns the invitations that the given user received.
+	 * @param userId Id of the user where the invitations should be searched for.
+	 * @return Response with status code (and probably error message).
+	 */
+	@GET
+	@Path("/invitations/{userId}")
+	@Produces(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Returns the invitations of the user.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, returns the invitations of the user."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "Unauthorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response getInvitationsByUser(@PathParam("userId") int userId) {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getInvitationsByUser: called with userId " + userId);
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			Connection connection = null;
+		    try {
+			    connection = dbm.getConnection();
+			    
+			    // load invitations by userId
+			    JSONArray invitations = ProjectInvitation.loadInvitationsByUser(userId, connection);
+			    
+			    // return them
+			    return Response.ok(invitations.toJSONString()).build();
+		    } catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
 	
 	/**
 	 * Method for retrieving the currently active user.
