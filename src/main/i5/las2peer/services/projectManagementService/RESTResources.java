@@ -9,6 +9,7 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -950,5 +951,62 @@ public class RESTResources {
 		}
 		
 		return Response.serverError().entity("Internal server error.").build();
+	}
+	
+	/**
+	 * Method to update the GitHub username of a CAE user.
+	 * @param inputUsername GitHub username that should be stored in the database.
+	 * @return Response with status code (and possibly error message).
+	 */
+	@PUT
+	@Path("/users")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Can be used to update the GitHub username of a user.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, updated GitHub username."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "Unauthorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Possibly an attribute is missing."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response putGitHubUsername(String inputUsername) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "putGitHubUsername: trying to edit users GitHub username");
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			Connection connection = null;
+		    try {
+			    connection = dbm.getConnection();
+			    
+			    // get user
+			    User user = authManager.getUser();
+			    
+			    // extract username from given json
+			    JSONObject json = (JSONObject) JSONValue.parse(inputUsername);
+			    if(json.containsKey("gitHubUsername")) {
+			    	String gitHubUsername = (String) json.get("gitHubUsername");
+			    	
+			    	// update username
+				    user.putUsername(gitHubUsername, connection);
+				    
+				    // response ok
+				    return Response.ok().build();
+			    } else {
+			        // attribute missing
+			    	return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+			    			.entity("Attribute 'gitHubUsername' is missing.").build();
+			    }
+		    } catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
 	}
 }

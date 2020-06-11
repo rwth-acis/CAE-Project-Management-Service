@@ -33,6 +33,12 @@ public class User {
 	private String loginName;
 	
 	/**
+	 * GitHub username of the user.
+	 * This does not need to be set.
+	 */
+	private String gitHubUsername;
+	
+	/**
 	 * Sets parameters except for the id.
 	 * Can be used before persisting the user.
 	 * @param email Email of the user that should be created.
@@ -67,6 +73,25 @@ public class User {
 	}
 	
 	/**
+	 * Updates the GitHub username of the user in the database.
+	 * @param username GitHub username that should be set.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public void putUsername(String username, Connection connection) throws SQLException {
+		this.gitHubUsername = username;
+		
+		// insert to database
+		PreparedStatement statement = connection.prepareStatement("UPDATE User SET gitHubUsername = ? WHERE id = ?;");
+		statement.setString(1, this.gitHubUsername);
+		statement.setInt(2, this.id);
+		
+		// execute update
+		statement.executeUpdate();
+		statement.close();
+	}
+	
+	/**
 	 * Method for loading user by given email from database.
 	 * @param email Email of user to search for.
 	 * @param connection a Connection object
@@ -85,6 +110,7 @@ public class User {
 		if (queryResult.next()) {
 			this.id = queryResult.getInt(1);
 			this.loginName = queryResult.getString("loginName");
+			this.gitHubUsername = queryResult.getString("gitHubUsername");
 		} else {
 			// there does not exist a user with the given email in the database
 			throw new UserNotFoundException();
@@ -128,6 +154,7 @@ public class User {
 		jsonUser.put("id", this.id);
 		jsonUser.put("loginName", this.loginName);
 		jsonUser.put("email", this.email);
+		jsonUser.put("gitHubUsername", this.gitHubUsername);
 
 		return jsonUser;
 	}
