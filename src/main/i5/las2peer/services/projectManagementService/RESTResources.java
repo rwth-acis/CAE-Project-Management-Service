@@ -876,12 +876,12 @@ public class RESTResources {
 	}
 	
 	/**
-	 * Returns the invitations that the given user received.
-	 * @param userId Id of the user where the invitations should be searched for.
+	 * Returns the invitations that the requesting user received.
+	 * Therefore, the user sending the request needs to be authorized.
 	 * @return Response with status code (and probably error message).
 	 */
 	@GET
-	@Path("/invitations/{userId}")
+	@Path("/invitations")
 	@Produces(MediaType.APPLICATION_JSON)
 	@ApiOperation(value = "Returns the invitations of the user.")
 	@ApiResponses(value = {
@@ -889,8 +889,8 @@ public class RESTResources {
 			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "Unauthorized."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
-	public Response getInvitationsByUser(@PathParam("userId") int userId) {
-        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getInvitationsByUser: called with userId " + userId);
+	public Response getInvitationsByUser() {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getInvitationsByUser: searching invitations for user");
 		
 		if(authManager.isAnonymous()) {
 			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
@@ -899,8 +899,11 @@ public class RESTResources {
 		    try {
 			    connection = dbm.getConnection();
 			    
+			    // get user
+			    User user = authManager.getUser();
+			    
 			    // load invitations by userId
-			    JSONArray invitations = ProjectInvitation.loadInvitationsByUser(userId, connection);
+			    JSONArray invitations = ProjectInvitation.loadInvitationsByUser(user.getId(), connection);
 			    
 			    // return them
 			    return Response.ok(invitations.toJSONString()).build();

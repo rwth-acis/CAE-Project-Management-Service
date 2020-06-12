@@ -102,7 +102,13 @@ public class ProjectInvitation {
 		while(queryResult.next()) {
 			ProjectInvitation inv = new ProjectInvitation(queryResult.getInt("id"),
 					queryResult.getInt("projectId"), queryResult.getInt("userId"));
-			invitations.add(inv.toJSONObject());
+			
+			JSONObject json = inv.toJSONObject();
+			// add name of project
+			Project project = new Project(inv.getProjectId(), connection);
+			json.put("projectName", project.getName());
+			
+			invitations.add(json);
 		}
 		
 		statement.close();
