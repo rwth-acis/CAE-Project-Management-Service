@@ -24,6 +24,7 @@ import i5.las2peer.services.projectManagementService.auth.AuthManager;
 import i5.las2peer.services.projectManagementService.component.Component;
 import i5.las2peer.services.projectManagementService.database.DatabaseManager;
 import i5.las2peer.services.projectManagementService.exception.GitHubException;
+import i5.las2peer.services.projectManagementService.exception.InvitationNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.ReqBazException;
 import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
@@ -251,25 +252,22 @@ public class RESTResources {
 	}
 	
 	/**
-	 * Adds a user to a project.
+	 * Adds a user to a project / accepts an invitation to a project.
 	 * Therefore, the user sending the request needs to be authorized in order
-	 * to check if the user is a member of the project, because only project members 
-	 * should be allowed to add users to it.
-	 * @param projectId Id of the project where the user should be added to.
-	 * @param inputUser JSON object containing a "loginName" attribute with the name of the user to add.
+	 * to check if an invitation for the user exists.
+	 * @param projectId Id of the project where the user should be added to.s
 	 * @return Response with status code (and possibly an error description).
 	 */
 	@POST
 	@Path("/projects/{id}/users")
 	@Consumes(MediaType.APPLICATION_JSON)
-	@ApiOperation(value = "Adds a user to the project.")
+	@ApiOperation(value = "Adds the user to the project / accepts an invitation.")
 	@ApiResponses(value = {
-			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, added user to project. Also returns JSON of user which got added."),
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, added user to project."),
 			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
-			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to add users to it."),
-			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or user to add to project could not be found."),
-			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Input user is not well formatted."),
-			@ApiResponse(code = HttpURLConnection.HTTP_CONFLICT, message = "The user is already member of the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_CONFLICT, message = "User is already member of the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not invited to the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with given id not found."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
 	public Response addUserToProject(@PathParam("id") int projectId, String inputUser) {
@@ -278,62 +276,49 @@ public class RESTResources {
 		if (authManager.isAnonymous()) {
             return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
         } else {
-            // check if user is allowed to add a user to the project
 			Connection connection = null;
 			try {
 			    connection = dbm.getConnection();
 			    
+			    // get user sending the request
 			    User user = authManager.getUser();
 			    
 			    // get project by id (load it from database)
 			    Project project = new Project(projectId, connection);
 			    
-			    if(project.hasUser(user.getId(), connection)) {
-			    	// user is part of the project and thus is allowed to add new users
-			    	// extract name of the user given in the request body (as json)
-			    	JSONObject jsonUserToAdd = (JSONObject) JSONValue.parseWithException(inputUser);
-			    	    
-			    	if(jsonUserToAdd.containsKey("loginName")) {
-			    	    String userToAddLoginName = (String) jsonUserToAdd.get("loginName");
-			    	    	
-			    	    User userToAdd = User.loadUserByLoginName(userToAddLoginName, connection);
-			    	    boolean added = project.addUser(userToAdd, connection, true); // true, because user also should be added to users list of Project object
-			    	    if(added) {
-			    	        // return result: ok
-			    	    	// user object should be returned
-			    	    	// also the assigned role should be included
-			    	    	JSONObject o = userToAdd.toJSONObject();
-			    	    	o.put("roleId", project.getRoleByUser(userToAdd).getId());
-			    	    	
-			    	        return Response.ok(o.toJSONString()).build();
-			    	    } else {
-			    	    	// user is already a member of the project
-			    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
-			    	    			.entity("User is already member of the project.").build();
-			    	    }
-			    	} else {
-			    	    return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
-			    	            .entity("Input user does not contain key 'loginName' which is needed.").build();
-			    	}
+			    // check if an invitation exists
+			    if(ProjectInvitation.exists(projectId, user.getId(), connection)) {
+			    	// invitation exists, thus add user to project
+			    	boolean added = project.addUser(user, connection, true); // true, because user also should be added to users list of Project object
+		    	    if(added) {
+		    	        // return result: ok
+		    	    	// user object should be returned
+		    	    	// also the assigned role should be included
+		    	    	JSONObject o = user.toJSONObject();
+		    	    	o.put("roleId", project.getRoleByUser(user).getId());
+		    	    	
+		    	    	// remove invitation
+		    	    	ProjectInvitation.delete(projectId, user.getId(), connection);
+		    	    	
+		    	        return Response.ok().build();
+		    	    } else {
+		    	    	// user is already a member of the project
+		    	    	// this should never be the case, because then there could not be an 
+		    	    	// invitation, but just in case it may happen at some point
+		    	    	return Response.status(HttpURLConnection.HTTP_CONFLICT)
+		    	    			.entity("User is already member of the project.").build();
+		    	    }
 			    } else {
-			    	// user does not have the permission to add users to the project
 			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
-			    			.entity("User needs to be member of the project to add a user to it.").build();
+			    			.entity("User is not invited to the project.").build();
 			    }
-			    
-			} catch (UserNotFoundException e) {
-				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
-						.entity("User with the given login name could not be found.").build();
 			} catch (ProjectNotFoundException e) {
 				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
 						.entity("Project with the given id could not be found.").build();
 			} catch (SQLException e) {
             	logger.printStackTrace(e);
             	return Response.serverError().entity("Internal server error.").build();
-            } catch (ParseException p) {
-	    		logger.printStackTrace(p);
-	    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Parse error.").build();
-	    	} finally {
+            } finally {
 				try {
 					if(connection != null) connection.close();
 				} catch (SQLException e) {
@@ -907,6 +892,71 @@ public class RESTResources {
 			    
 			    // return them
 			    return Response.ok(invitations.toJSONString()).build();
+		    } catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Deletes the invitation with the given id.
+	 * This method may be used to decline an invitation to a project.
+	 * @param invitationId Id of the invitation that should be deleted/declined.
+	 * @return Response with status code (and possibly error message).
+	 */
+	@DELETE
+	@Path("/invitations/{invitationId}")
+	@ApiOperation(value = "Deletes the invitation with the given id.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, deleted invitation."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "Unauthorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "Invitation does not belong to the user. Thus the user is not allowed to delete it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Invitation with the given id could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response deleteInvitation(@PathParam("invitationId") int invitationId) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "deleteInvitation: trying to delete invitation with id " + invitationId);
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			Connection connection = null;
+		    try {
+			    connection = dbm.getConnection();
+			    
+			    // get user
+			    User user = authManager.getUser();
+			    
+			    // check if the invitation belong to the user
+			    // try to load the invitation
+			    ProjectInvitation inv = new ProjectInvitation(invitationId, connection);
+			    
+			    // if no InvitationNotFoundException got thrown, then the invitation exists
+			    // check if the invitation belongs to the user now
+			    if(inv.getUserId() == user.getId()) {
+			    	// invitation belongs to user
+			    	// delete it from database
+			    	inv.delete(connection);
+			    	
+			    	return Response.ok().build();
+			    } else {
+			    	// invitation does not belong to the user
+			    	// thus, user is not allowed to delete it
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("Your do not have the permission to delete this invitation.").build();
+			    }
+		    } catch (InvitationNotFoundException e) {
+		    	logger.printStackTrace(e);
+            	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+            			.entity("Invitation with given id could not be found.").build();
 		    } catch (SQLException e) {
             	logger.printStackTrace(e);
             	return Response.serverError().entity("Internal server error.").build();

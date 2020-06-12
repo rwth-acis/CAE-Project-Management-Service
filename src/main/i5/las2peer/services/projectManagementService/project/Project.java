@@ -512,6 +512,7 @@ public class Project {
 		
 		// do not auto commit after inserting user to ProjectToUser table, because
 		// after that when the role gets set an error might occur
+		boolean autoCommitPrevious = connection.getAutoCommit();
 		connection.setAutoCommit(false);
 		
 		// user is not part of the project yet, so add the user
@@ -554,6 +555,8 @@ public class Project {
 			// roll back the whole stuff
 			connection.rollback();
 		    throw e;
+		} finally {
+			connection.setAutoCommit(autoCommitPrevious);
 		}
 		return true;
 	}

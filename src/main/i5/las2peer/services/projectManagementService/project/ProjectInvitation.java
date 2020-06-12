@@ -10,6 +10,7 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
 
+import i5.las2peer.services.projectManagementService.exception.InvitationNotFoundException;
 import net.minidev.json.JSONValue;
 
 /**
@@ -43,6 +44,28 @@ public class ProjectInvitation {
 	public ProjectInvitation(int projectId, int userId) {
 		this.projectId = projectId;
 		this.userId = userId;
+	}
+	
+	/**
+	 * Loads the invitation with the given id from the database.
+	 * @param invitationId Id of the invitation to search for.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public ProjectInvitation(int invitationId, Connection connection) throws SQLException {
+		PreparedStatement statement = connection.prepareStatement("SELECT * FROM ProjectInvitation WHERE id = ?;");
+		statement.setInt(1, invitationId);
+		
+		// execute query
+		ResultSet result = statement.executeQuery();
+		if(result.next()) {
+			this.id = invitationId;
+			this.projectId = result.getInt("projectId");
+			this.userId = result.getInt("userId");
+		} else {
+			throw new InvitationNotFoundException();
+		}
+		statement.close();
 	}
 	
 	/**
@@ -83,6 +106,37 @@ public class ProjectInvitation {
 		boolean exists = queryResult.next();
 		statement.close();
 		return exists;
+	}
+	
+	/**
+	 * Deletes the invitation from the database.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public void delete(Connection connection) throws SQLException {
+		PreparedStatement statement = connection.prepareStatement("DELETE FROM ProjectInvitation WHERE id = ?;");
+		statement.setInt(1, this.id);
+		
+		// execute update
+		statement.executeUpdate();
+		statement.close();
+	}
+	
+	/**
+	 * Deletes the invitation from the database.
+	 * @param projectId Id of the project.
+	 * @param userId Id of the user.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public static void delete(int projectId, int userId, Connection connection) throws SQLException {
+		PreparedStatement statement = connection.prepareStatement("DELETE FROM ProjectInvitation WHERE projectId = ? AND userId = ?;");
+		statement.setInt(1, projectId);
+		statement.setInt(2, userId);
+		
+		// execute update
+		statement.executeUpdate();
+		statement.close();
 	}
 	
 	/**
@@ -129,6 +183,10 @@ public class ProjectInvitation {
 		jsonInvitation.put("userId", this.userId);
 		
 		return jsonInvitation;
+	}
+	
+	public int getUserId() {
+		return this.userId;
 	}
 	
 	public int getProjectId() {
