@@ -149,8 +149,8 @@ public class Component {
 			this.versionedModelId = ComponentInitHelper.createEmptyVersionedModel(connection);
 			
 			// create category in requirements bazaar
-			String categoryName = project.getId() + "-" + this.name;
-			this.reqBazCategory = ReqBazHelper.getInstance().createCategory(categoryName, accessToken);
+			//String categoryName = project.getId() + "-" + this.name;
+			//this.reqBazCategory = ReqBazHelper.getInstance().createCategory(categoryName, accessToken);
 			
 			// create component
 		    PreparedStatement statement = connection
@@ -158,9 +158,11 @@ public class Component {
 		    statement.setString(1, this.name);
 		    statement.setString(2, typeToString());
 		    statement.setInt(3, versionedModelId);
-		    statement.setInt(4, this.reqBazCategory.getProjectId());
-		    statement.setInt(5, this.reqBazCategory.getId());
-		
+		    //statement.setInt(4, this.reqBazCategory.getProjectId());
+		    //statement.setInt(5, this.reqBazCategory.getId());
+		    statement.setInt(4, 0);
+		    statement.setInt(5, 0);
+		    
 		    // execute update
 		    statement.executeUpdate();
 		    // get the generated component id and close statement
