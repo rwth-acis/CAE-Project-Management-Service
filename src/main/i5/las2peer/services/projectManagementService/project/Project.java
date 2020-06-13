@@ -701,6 +701,10 @@ public class Project {
 		return components;
 	}
 	
+	public GitHubProject getGitHubProject() {
+		return this.gitHubProject;
+	}
+	
 	/**
 	 * Checks if the list of components of the project contains 
 	 * a component with the given id.

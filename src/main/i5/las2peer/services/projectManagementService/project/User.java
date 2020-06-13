@@ -5,10 +5,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 
 import org.json.simple.JSONObject;
 
+import i5.las2peer.services.projectManagementService.exception.GitHubException;
 import i5.las2peer.services.projectManagementService.exception.UserNotFoundException;
+import i5.las2peer.services.projectManagementService.github.GitHubHelper;
 
 /**
  * (Data-)Class for User. Provides means to convert Object
@@ -74,11 +77,14 @@ public class User {
 	
 	/**
 	 * Updates the GitHub username of the user in the database.
+	 * Also grants the given username access to all the CAE projects where the user 
+	 * is a member of.
 	 * @param username GitHub username that should be set.
 	 * @param connection Connection object
 	 * @throws SQLException If something with the database went wrong.
+	 * @throws GitHubException If something with the communication to the GitHub API went wrong.
 	 */
-	public void putUsername(String username, Connection connection) throws SQLException {
+	public void putUsername(String username, Connection connection) throws SQLException, GitHubException {
 		this.gitHubUsername = username;
 		
 		// insert to database
@@ -89,6 +95,12 @@ public class User {
 		// execute update
 		statement.executeUpdate();
 		statement.close();
+		
+		// grant access to every GitHub project for every CAE project where the user is a member of
+		ArrayList<Project> projects = Project.getProjectsByUser(this.id, connection);
+		for(Project project : projects) {
+			GitHubHelper.getInstance().grantUserAccessToProject(username, project.getGitHubProject());
+		}
 	}
 	
 	/**
@@ -157,6 +169,10 @@ public class User {
 		jsonUser.put("gitHubUsername", this.gitHubUsername);
 
 		return jsonUser;
+	}
+	
+	public String getGitHubUsername() {
+		return this.gitHubUsername;
 	}
 	
 	public int getId() {

@@ -85,6 +85,43 @@ public class GitHubHelper {
 		
 		return gitHubProject;
 	}
+	
+	/**
+	 * Gives the GitHub user with the given username access to the given GitHub project.
+	 * @param ghUsername Username of the GitHub user which should get access to the project.
+	 * @param ghProject GitHubProject object
+	 * @throws GitHubException If something with the API request went wrong
+	 */
+	public void grantUserAccessToProject(String ghUsername, GitHubProject ghProject) throws GitHubException {
+		if(ghUsername == null) return;
+		
+		String authStringEnc = getAuthStringEnc();
+		
+		URL url;
+		try {
+			url = new URL(API_BASE_URL + "/projects/" + ghProject.getId() + "/collaborators/" + ghUsername);
+
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("PUT");
+			connection.setDoInput(true);
+			connection.setDoOutput(true);
+			connection.setUseCaches(false);
+			connection.setRequestProperty("Accept", "application/vnd.github.inertia-preview+json");
+			connection.setRequestProperty("Authorization", "Basic " + authStringEnc);
+			
+			// forward (in case of) error
+			if (connection.getResponseCode() != 204) {
+				String message = getErrorMessage(connection);
+				throw new GitHubException(message);
+			}
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		}
+	}
 
 	/**
 	 * Creates a GitHub project in the GitHub organization given by the properties file.

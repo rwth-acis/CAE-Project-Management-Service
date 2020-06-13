@@ -29,6 +29,7 @@ import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundEx
 import i5.las2peer.services.projectManagementService.exception.ReqBazException;
 import i5.las2peer.services.projectManagementService.exception.RoleNotFoundException;
 import i5.las2peer.services.projectManagementService.exception.UserNotFoundException;
+import i5.las2peer.services.projectManagementService.github.GitHubHelper;
 import i5.las2peer.services.projectManagementService.project.Project;
 import i5.las2peer.services.projectManagementService.project.ProjectInvitation;
 import i5.las2peer.services.projectManagementService.project.Role;
@@ -127,6 +128,11 @@ public class RESTResources {
 			    		
 			    		// persist method also stores users of the project (only the creator for now) etc.
 				    	project.persist(connection, accessToken);
+				    	
+				    	// if user has stored a GitHub username, then grant access to the GitHub project
+				    	if(user.getGitHubUsername() != null) {
+				    	    GitHubHelper.getInstance().grantUserAccessToProject(user.getGitHubUsername(), project.getGitHubProject());
+				    	}
 				    	
 						return Response.status(HttpURLConnection.HTTP_CREATED).entity(project.toJSONObject().toJSONString()).build();
 			    	} else {
@@ -300,6 +306,11 @@ public class RESTResources {
 		    	    	// remove invitation
 		    	    	ProjectInvitation.delete(projectId, user.getId(), connection);
 		    	    	
+		    	    	// grant user access to GitHub project if user has stored a GitHub username
+		    	    	if(user.getGitHubUsername() != null) {
+		    	    		GitHubHelper.getInstance().grantUserAccessToProject(user.getGitHubUsername(), project.getGitHubProject());
+		    	    	}
+		    	    	
 		    	        return Response.ok().build();
 		    	    } else {
 		    	    	// user is already a member of the project
@@ -318,7 +329,10 @@ public class RESTResources {
 			} catch (SQLException e) {
             	logger.printStackTrace(e);
             	return Response.serverError().entity("Internal server error.").build();
-            } finally {
+            } catch (GitHubException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+			} finally {
 				try {
 					if(connection != null) connection.close();
 				} catch (SQLException e) {
@@ -1052,7 +1066,10 @@ public class RESTResources {
 		    } catch (SQLException e) {
             	logger.printStackTrace(e);
             	return Response.serverError().entity("Internal server error.").build();
-            } finally {
+            } catch (GitHubException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error occurred during using the GitHub API.").build();
+			} finally {
 				try {
 					if(connection != null) connection.close();
 				} catch (SQLException e) {
