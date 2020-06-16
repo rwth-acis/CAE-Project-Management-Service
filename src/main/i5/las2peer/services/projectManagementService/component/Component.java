@@ -10,6 +10,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
+import i5.las2peer.api.Context;
+import i5.las2peer.services.projectManagementService.ProjectManagementService;
 import i5.las2peer.services.projectManagementService.exception.ReqBazException;
 import i5.las2peer.services.projectManagementService.project.Project;
 import i5.las2peer.services.projectManagementService.reqbaz.ReqBazCategory;
@@ -149,8 +151,11 @@ public class Component {
 			this.versionedModelId = ComponentInitHelper.createEmptyVersionedModel(connection);
 			
 			// create category in requirements bazaar
-			//String categoryName = project.getId() + "-" + this.name;
-			//this.reqBazCategory = ReqBazHelper.getInstance().createCategory(categoryName, accessToken);
+			ProjectManagementService service = (ProjectManagementService) Context.getCurrent().getService();
+			if(!service.isCategoryCreationDisabled()) {
+			    String categoryName = project.getId() + "-" + this.name;
+			    this.reqBazCategory = ReqBazHelper.getInstance().createCategory(categoryName, accessToken);
+			}
 			
 			// create component
 		    PreparedStatement statement = connection
@@ -158,10 +163,14 @@ public class Component {
 		    statement.setString(1, this.name);
 		    statement.setString(2, typeToString());
 		    statement.setInt(3, versionedModelId);
-		    //statement.setInt(4, this.reqBazCategory.getProjectId());
-		    //statement.setInt(5, this.reqBazCategory.getId());
-		    statement.setInt(4, 0);
-		    statement.setInt(5, 0);
+		    
+		    if(!service.isCategoryCreationDisabled()) {
+		    	statement.setInt(4, this.reqBazCategory.getProjectId());
+			    statement.setInt(5, this.reqBazCategory.getId());	
+		    } else {
+		        statement.setInt(4, 0);
+		        statement.setInt(5, 0);
+		    }
 		    
 		    // execute update
 		    statement.executeUpdate();

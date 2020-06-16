@@ -49,6 +49,8 @@ public class ProjectManagementService extends RESTService {
 	 */
 	private String reqBazBackendUrl;
 	private int reqBazProjectId;
+	// debug variable to turn on/off the creation of requirements bazaar categories
+	private boolean debugDisableCategoryCreation;
 	
 	public ProjectManagementService() {
 		// read and set properties values
@@ -76,6 +78,10 @@ public class ProjectManagementService extends RESTService {
 	
 	public DatabaseManager getDbm(){
 		return dbm;
+	}
+	
+	public boolean isCategoryCreationDisabled() {
+		return this.debugDisableCategoryCreation;
 	}
 	
 	/**

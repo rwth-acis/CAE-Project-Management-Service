@@ -33,6 +33,7 @@ export MYSQL_DATABASE='commedit'
 [[ -z "${SERVICE_PASSPHRASE}" ]] && export SERVICE_PASSPHRASE='Passphrase'
 [[ -z "${MYSQL_HOST}" ]] && export MYSQL_HOST='mysql'
 [[ -z "${MYSQL_PORT}" ]] && export MYSQL_PORT='3306'
+[[ -z "${DISABLE_CATEGORY_CREATION}" ]] && export DISABLE_CATEGORY_CREATION='false'
 
 # set defaults for optional web connector parameters
 [[ -z "${START_HTTP}" ]] && export START_HTTP='TRUE'
@@ -56,6 +57,7 @@ set_in_service_config jdbcPass ${MYSQL_PASSWORD}
 set_in_service_config gitHubUser ${GITHUB_USER}
 set_in_service_config gitHubPassword ${GITHUB_PASSWORD}
 set_in_service_config gitHubOrganization ${GITHUB_ORGANIZATION}
+set_in_service_config debugDisableCategoryCreation ${DISABLE_CATEGORY_CREATION}
 
 # configure web connector properties
 
