@@ -384,6 +384,53 @@ public class Project {
 	}
 	
 	/**
+	 * Deletes the project from the database.
+	 * When deleting it, the Roles that are connected to the project are 
+	 * also automatically deleted. Then, the entries in UserToRole are also
+	 * automatically deleted.
+	 * Entries of ProjectToUser are also deleted automatically.
+	 * 
+	 * The connections to the components are also deleted automatically from 
+	 * the database, but the components currently remain in the database.
+	 * TODO: Later, when dependencies are working, then components of the project 
+	 * may be deleted too, if they are not used as a dependency somewhere else.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 * @throws GitHubException If something with the request to GitHub API went wrong.
+	 */
+	public void delete(Connection connection) throws SQLException, GitHubException {
+		PreparedStatement statement;
+		// store current value of auto commit
+		boolean autoCommitBefore = connection.getAutoCommit();
+		try {
+			connection.setAutoCommit(false);
+			
+			statement = connection.prepareStatement("DELETE FROM Project WHERE id = ?;");
+			statement.setInt(1, this.id);
+			statement.executeUpdate();
+			statement.close();
+			
+			// also delete the corresponding GitHub project
+			GitHubHelper.getInstance().deleteGitHubProject(this.getGitHubProject());
+			
+			// TODO: Delete components that are not used anymore (somewhere as a dependency).
+			// TODO: When a component gets deleted, then the category in the Requirements Bazaar
+			//       needs to be deleted too.
+		} catch (GitHubException e) {
+			// roll back the whole stuff
+			connection.rollback();
+			throw e;
+		} catch (SQLException e) {
+			// roll back the whole stuff
+			connection.rollback();
+			throw e;
+		} finally {
+			// reset auto commit to previous value
+			connection.setAutoCommit(autoCommitBefore);
+		}
+	}
+	
+	/**
 	 * Returns the JSON representation of this project.
 	 * @return a JSON object representing a project
 	 */

@@ -220,6 +220,70 @@ public class RESTResources {
 	}
 	
 	/**
+	 * Deletes the project with the given id.
+	 * Therefore, the user sending the request needs to be a member 
+	 * of the project.
+	 * @param projectId Id of the project which should be removed.
+	 * @return Response with status code (and possibly error message).
+	 */
+	@DELETE
+	@Path("/projects/{projectId}")
+	@ApiOperation(value = "Deletes the project from the database.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_NO_CONTENT, message = "Successfully deleted project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User is not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User needs to be member of the project to delete it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Could not find project with the given id."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response deleteProject(@PathParam("projectId") int projectId) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "deleteProject: deleting project with id " + projectId);
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).entity("User not authorized.").build();
+		} else {
+			// check if user is allowed to remove a user from the project
+			Connection connection = null;
+			try {
+			    connection = dbm.getConnection();
+						    
+				User user = authManager.getUser();
+						    
+			    // get project by id (load it from database)
+				Project project = new Project(projectId, connection);
+						    
+				if(project.hasUser(user.getId(), connection)) {
+				    // user is part of the project and thus is allowed to delete it
+					// delete the project
+					project.delete(connection);
+					return Response.status(HttpURLConnection.HTTP_NO_CONTENT).build();
+				} else {
+					// user is no member of the project and thus cannot delete it
+					return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+							.entity("User needs to be member of the project to delete it.").build();
+				}
+			} catch (ProjectNotFoundException e) {
+				logger.printStackTrace(e);
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND).build();
+			} catch (SQLException e) {
+	        	logger.printStackTrace(e);
+	        	return Response.serverError().entity("Internal server error.").build();
+	        } catch (GitHubException e) {
+	        	logger.printStackTrace(e);
+	        	return Response.serverError().entity("Internal server error: Problem with GitHub.").build();
+			} finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+		
+	}
+	
+	/**
 	 * Searches for projects in the database.
 	 * Therefore, no authorization is needed.
 	 * @param projectName Project name to search for.
