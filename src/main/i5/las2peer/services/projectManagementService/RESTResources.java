@@ -1085,6 +1085,47 @@ public class RESTResources {
 	}
 	
 	/**
+	 * Searches for users where the username is like the given username.
+	 * @param username Username to search for.
+	 * @return Response with status code (and possibly error message).
+	 */
+	@GET
+	@Path("/users/{username}")
+	@ApiOperation(value = "Searches for users where the username is like the given username.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, returning list of users that were found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response searchUsers(@PathParam("username") String username) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "searchUsers: searching for users with a username like " + username);
+		
+		Connection connection = null;
+	    try {
+		    connection = dbm.getConnection();
+		    
+		    ArrayList<User> users = User.searchUsers(username, connection);
+		    
+		    JSONArray jsonUsers = new JSONArray();
+		    // only add the usernames
+		    for(User user : users) {
+		    	jsonUsers.add(user.getLoginName());
+		    }
+		    return Response.ok(jsonUsers.toJSONString()).build();
+	    } catch (SQLException e) {
+        	logger.printStackTrace(e);
+        	return Response.serverError().entity("Internal server error.").build();
+        } finally {
+			try {
+				if(connection != null) connection.close();
+			} catch (SQLException e) {
+				logger.printStackTrace(e);
+				return Response.serverError().entity("Internal server error.").build();
+			}
+		}
+		
+	}
+	
+	/**
 	 * Method to update the GitHub username of a CAE user.
 	 * @param inputUsername GitHub username that should be stored in the database.
 	 * @return Response with status code (and possibly error message).

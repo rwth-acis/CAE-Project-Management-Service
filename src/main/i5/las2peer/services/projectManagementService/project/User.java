@@ -155,6 +155,29 @@ public class User {
 	}
 	
 	/**
+	 * Searches for users in the database where the login name is like the given one.
+	 * @param loginName Login name to search for.
+	 * @param connection Connection object
+	 * @return ArrayList containing the User objects that were found.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public static ArrayList<User> searchUsers(String loginName, Connection connection) throws SQLException {
+		PreparedStatement statement = connection.prepareStatement("SELECT * FROM User WHERE loginName LIKE ?;");
+		statement.setString(1, "%" + loginName + "%");
+		// execute query
+		ResultSet queryResult = statement.executeQuery();
+		
+		ArrayList<User> users = new ArrayList<>();
+		
+		while(queryResult.next()) {
+			String email = queryResult.getString("email");
+			users.add(new User(email, connection));
+		}
+		
+		return users;
+	}
+	
+	/**
 	 * Creates a JSON object from the user object.
 	 * @return JSONObject containing the user information.
 	 */
@@ -169,6 +192,10 @@ public class User {
 		jsonUser.put("gitHubUsername", this.gitHubUsername);
 
 		return jsonUser;
+	}
+	
+	public String getLoginName() {
+		return this.loginName;
 	}
 	
 	public String getGitHubUsername() {
