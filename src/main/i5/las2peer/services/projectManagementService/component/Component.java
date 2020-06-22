@@ -12,6 +12,7 @@ import org.json.simple.parser.ParseException;
 
 import i5.las2peer.api.Context;
 import i5.las2peer.services.projectManagementService.ProjectManagementService;
+import i5.las2peer.services.projectManagementService.exception.GitHubException;
 import i5.las2peer.services.projectManagementService.exception.ReqBazException;
 import i5.las2peer.services.projectManagementService.project.Project;
 import i5.las2peer.services.projectManagementService.reqbaz.ReqBazCategory;
@@ -168,8 +169,9 @@ public class Component {
 		    	statement.setInt(4, this.reqBazCategory.getProjectId());
 			    statement.setInt(5, this.reqBazCategory.getId());	
 		    } else {
-		        statement.setInt(4, 0);
-		        statement.setInt(5, 0);
+		    	// -1 stands for no Requirements Bazaar category connected
+		        statement.setInt(4, -1);
+		        statement.setInt(5, -1);
 		    }
 		    
 		    // execute update
@@ -195,6 +197,44 @@ public class Component {
 		} finally {
 			connection.setAutoCommit(autoCommitBefore);
 		}
+	}
+	
+	/**
+	 * Deletes the component from the database.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public void delete(Connection connection) throws SQLException {
+		PreparedStatement statement;
+		// store current value of auto commit
+		boolean autoCommitBefore = connection.getAutoCommit();
+		try {
+			connection.setAutoCommit(false);
+			
+			// delete component from database
+			statement = connection.prepareStatement("DELETE FROM Component WHERE id = ?;");
+			statement.setInt(1, this.id);
+			statement.executeUpdate();
+			statement.close();
+			
+			// TODO: delete corresponding category in the Requirements Bazaar
+		} catch (SQLException e) {
+			// roll back the whole stuff
+			connection.rollback();
+			throw e;
+		} finally {
+			// reset auto commit to previous value
+			connection.setAutoCommit(autoCommitBefore);
+		}
+	}
+	
+	/**
+	 * Checks whether the component is connected to a Requirements Bazaar category.
+	 * @return Whether the component is connected to a Requirements Bazaar category.
+	 */
+	private boolean isConnectedToReqBaz() {
+		if(this.reqBazCategory == null) return false;
+		return this.reqBazCategory.getId() != -1;
 	}
 	
 	@SuppressWarnings("unchecked")

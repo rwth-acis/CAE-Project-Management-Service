@@ -413,9 +413,11 @@ public class Project {
 			// also delete the corresponding GitHub project
 			GitHubHelper.getInstance().deleteGitHubProject(this.getGitHubProject());
 			
-			// TODO: Delete components that are not used anymore (somewhere as a dependency).
-			// TODO: When a component gets deleted, then the category in the Requirements Bazaar
-			//       needs to be deleted too.
+			// currently, just delete every component
+			// TODO: only delete components, if they are not used as a dependency
+			for(Component component : this.components) {
+				component.delete(connection);
+			}
 		} catch (GitHubException e) {
 			// roll back the whole stuff
 			connection.rollback();
@@ -771,14 +773,20 @@ public class Project {
 	 * @param connection Connection object
 	 * @return True, if component could be removed. False, if component is not included in project and thus could not be removed.
 	 * @throws SQLException If something with the database went wrong.
+	 * @throws ParseException If something parsing the component type from database went wrong.
 	 */
-	public boolean removeComponent(int componentId, Connection connection) throws SQLException {
+	public boolean removeComponent(int componentId, Connection connection) throws SQLException, ParseException {
 		if(!hasComponent(componentId)) return false;
 		
 		PreparedStatement statement = connection
 				.prepareStatement("DELETE FROM ProjectToComponent WHERE projectId = ? AND componentId = ?;");
 		statement.setInt(1, this.id);
 		statement.setInt(2, componentId);
+		
+		// delete the component
+		// TODO: only delete it, if it is not used as a dependency somewhere
+		Component component = new Component(componentId, connection);
+		component.delete(connection);
 		
 		// execute update and close statement
 		statement.executeUpdate();

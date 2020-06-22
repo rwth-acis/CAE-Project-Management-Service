@@ -829,7 +829,10 @@ public class RESTResources {
 			} catch (SQLException e) {
             	logger.printStackTrace(e);
             	return Response.serverError().entity("Internal server error.").build();
-            } finally {
+            } catch (ParseException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+			} finally {
 				try {
 					if(connection != null) connection.close();
 				} catch (SQLException e) {
