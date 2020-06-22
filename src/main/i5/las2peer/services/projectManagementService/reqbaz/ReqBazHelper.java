@@ -122,7 +122,9 @@ public class ReqBazHelper {
 			connection.setRequestProperty("Authorization", "Bearer " + oidcToken);
 					
 		    // forward (in case of) error
-		    if (connection.getResponseCode() != 200) {
+            // 200 is ok, since then the category got deleted
+			// 404 is ok, because then the category already got deleted before we tried to delete it (maybe manually by a user)
+		    if (connection.getResponseCode() != 200 && connection.getResponseCode() != 404) {
 				String message = getErrorMessage(connection);
 				throw new ReqBazException(message);
 			}
