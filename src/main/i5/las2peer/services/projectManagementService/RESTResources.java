@@ -222,21 +222,24 @@ public class RESTResources {
 	/**
 	 * Deletes the project with the given id.
 	 * Therefore, the user sending the request needs to be a member 
-	 * of the project.
+	 * of the project and an access token is needed for accessing the 
+	 * Requirements Bazaar API.
 	 * @param projectId Id of the project which should be removed.
 	 * @return Response with status code (and possibly error message).
 	 */
 	@DELETE
 	@Path("/projects/{projectId}")
+	@Consumes(MediaType.APPLICATION_JSON)
 	@ApiOperation(value = "Deletes the project from the database.")
 	@ApiResponses(value = {
 			@ApiResponse(code = HttpURLConnection.HTTP_NO_CONTENT, message = "Successfully deleted project."),
 			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User is not authorized."),
 			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User needs to be member of the project to delete it."),
 			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Could not find project with the given id."),
+			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Access token is missing."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
-	public Response deleteProject(@PathParam("projectId") int projectId) {
+	public Response deleteProject(@PathParam("projectId") int projectId, String body) {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "deleteProject: deleting project with id " + projectId);
 		
 		if(authManager.isAnonymous()) {
@@ -254,8 +257,13 @@ public class RESTResources {
 						    
 				if(project.hasUser(user.getId(), connection)) {
 				    // user is part of the project and thus is allowed to delete it
+					JSONObject json = (JSONObject) JSONValue.parse(body);
+			    	if(!json.containsKey("access_token")) {
+			    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Access token missing.").build();
+			    	}
+			    	String accessToken = (String) json.get("access_token");
 					// delete the project
-					project.delete(connection);
+					project.delete(connection, accessToken);
 					return Response.status(HttpURLConnection.HTTP_NO_CONTENT).build();
 				} else {
 					// user is no member of the project and thus cannot delete it
@@ -271,6 +279,9 @@ public class RESTResources {
 	        } catch (GitHubException e) {
 	        	logger.printStackTrace(e);
 	        	return Response.serverError().entity("Internal server error: Problem with GitHub.").build();
+			} catch (ReqBazException e) {
+				logger.printStackTrace(e);
+	        	return Response.serverError().entity("Internal server error: Problem with Requirements Bazaar.").build();
 			} finally {
 				try {
 					if(connection != null) connection.close();
@@ -770,6 +781,7 @@ public class RESTResources {
 	/**
 	 * Removes the component with the given id from the project with the given id.
 	 * Therefore, the user sending the request needs to be a member of the project.
+	 * Access token needs to be sent in the method body.
 	 * Note: Currently, the component will not be deleted, since it might be used as a dependency
 	 * somewhere else. Right now only the entry in the ProjectToComponent table gets removed.
 	 * TODO: When dependencies are included, then this method needs to be updated: Check if component
@@ -781,15 +793,17 @@ public class RESTResources {
 	 */
 	@DELETE
 	@Path("/projects/{projectId}/components/{componentId}")
+	@Consumes(MediaType.APPLICATION_JSON)
 	@ApiOperation(value = "Removes a component from a project.")
 	@ApiResponses(value = {
 			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, removed component from project."),
 			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
 			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to remove components from it."),
 			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or component to remove from project could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Access token missing."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
-	public Response removeProjectComponent(@PathParam("projectId") int projectId, @PathParam("componentId") int componentId) {
+	public Response removeProjectComponent(@PathParam("projectId") int projectId, @PathParam("componentId") int componentId, String body) {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE,
 				"removeProjectComponent: trying to remove component with id " + componentId +
 				" from project with id " + projectId);
@@ -809,7 +823,13 @@ public class RESTResources {
 			    
 			    if(project.hasUser(user.getId(), connection)) {
 			    	// user is allowed to remove components from the project
-			    	boolean removed = project.removeComponent(componentId, connection);
+			    	JSONObject json = (JSONObject) JSONValue.parse(body);
+			    	if(!json.containsKey("access_token")) {
+			    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST).entity("Access token missing.").build();
+			    	}
+			    	String accessToken = (String) json.get("access_token");
+			    	
+			    	boolean removed = project.removeComponent(componentId, connection, accessToken);
 		    		if(removed) {
 		    			// removed component successfully
 		    			return Response.ok().build();
@@ -831,6 +851,9 @@ public class RESTResources {
             	return Response.serverError().entity("Internal server error.").build();
             } catch (ParseException e) {
             	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+			} catch (ReqBazException e) {
+				logger.printStackTrace(e);
             	return Response.serverError().entity("Internal server error.").build();
 			} finally {
 				try {

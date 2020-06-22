@@ -101,6 +101,41 @@ public class ReqBazHelper {
 	}
 	
 	/**
+	 * Deletes the category in the Requirements Bazaar.
+	 * @param category ReqBazCategory which should be deleted.
+	 * @param accessToken Access Token of the user, needed to use the Requirements Bazaar API.
+	 * @throws ReqBazException If something with the API went wrong.
+	 */
+	public void deleteCategory(ReqBazCategory category, String accessToken) throws ReqBazException {
+		// this is the access token from the user that wants to create the project
+		String oidcToken = accessToken;
+				
+		URL url;
+		try {
+			url = new URL(this.reqBazBackendUrl + "/categories/" + category.getId());
+
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("DELETE");
+			connection.setDoInput(true);
+			connection.setDoOutput(true);
+			connection.setUseCaches(false);
+			connection.setRequestProperty("Authorization", "Bearer " + oidcToken);
+					
+		    // forward (in case of) error
+		    if (connection.getResponseCode() != 200) {
+				String message = getErrorMessage(connection);
+				throw new ReqBazException(message);
+			}
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+			throw new ReqBazException(e.getMessage());
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new ReqBazException(e.getMessage());
+		}
+	}
+	
+	/**
 	 * Creates the body needed to create a new category in a Requirements Bazaar project.
 	 * @param categoryName Name of the category that should be created.
 	 * @return Body as string.

@@ -395,10 +395,12 @@ public class Project {
 	 * TODO: Later, when dependencies are working, then components of the project 
 	 * may be deleted too, if they are not used as a dependency somewhere else.
 	 * @param connection Connection object
+	 * @param accessToken Access Token of the user needed to access the Requirements Bazaar API.
 	 * @throws SQLException If something with the database went wrong.
 	 * @throws GitHubException If something with the request to GitHub API went wrong.
+	 * @throws ReqBazException If something with the request to the Requirements Bazaar API went wrong.
 	 */
-	public void delete(Connection connection) throws SQLException, GitHubException {
+	public void delete(Connection connection, String accessToken) throws SQLException, GitHubException, ReqBazException {
 		PreparedStatement statement;
 		// store current value of auto commit
 		boolean autoCommitBefore = connection.getAutoCommit();
@@ -416,13 +418,17 @@ public class Project {
 			// currently, just delete every component
 			// TODO: only delete components, if they are not used as a dependency
 			for(Component component : this.components) {
-				component.delete(connection);
+				component.delete(connection, accessToken);
 			}
 		} catch (GitHubException e) {
 			// roll back the whole stuff
 			connection.rollback();
 			throw e;
 		} catch (SQLException e) {
+			// roll back the whole stuff
+			connection.rollback();
+			throw e;
+		} catch (ReqBazException e) {
 			// roll back the whole stuff
 			connection.rollback();
 			throw e;
@@ -771,11 +777,13 @@ public class Project {
 	 * Removes the component with the given id from the project.
 	 * @param componentId Id of the component which should be removed from the project.
 	 * @param connection Connection object
+	 * @param accessToken Access token to access the Requirements Bazaar API.
 	 * @return True, if component could be removed. False, if component is not included in project and thus could not be removed.
 	 * @throws SQLException If something with the database went wrong.
 	 * @throws ParseException If something parsing the component type from database went wrong.
+	 * @throws ReqBazException If something with the Requirements Bazaar API went wrong.
 	 */
-	public boolean removeComponent(int componentId, Connection connection) throws SQLException, ParseException {
+	public boolean removeComponent(int componentId, Connection connection, String accessToken) throws SQLException, ParseException, ReqBazException {
 		if(!hasComponent(componentId)) return false;
 		
 		PreparedStatement statement = connection
@@ -786,7 +794,7 @@ public class Project {
 		// delete the component
 		// TODO: only delete it, if it is not used as a dependency somewhere
 		Component component = new Component(componentId, connection);
-		component.delete(connection);
+		component.delete(connection, accessToken);
 		
 		// execute update and close statement
 		statement.executeUpdate();

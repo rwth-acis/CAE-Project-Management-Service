@@ -202,9 +202,11 @@ public class Component {
 	/**
 	 * Deletes the component from the database.
 	 * @param connection Connection object
+	 * @param accessToken Access token of the user, required to access the Requirements Bazaar API.
 	 * @throws SQLException If something with the database went wrong.
+	 * @throws ReqBazException If something with the Requirements Bazaar API went wrong.
 	 */
-	public void delete(Connection connection) throws SQLException {
+	public void delete(Connection connection, String accessToken) throws SQLException, ReqBazException {
 		PreparedStatement statement;
 		// store current value of auto commit
 		boolean autoCommitBefore = connection.getAutoCommit();
@@ -218,7 +220,14 @@ public class Component {
 			statement.close();
 			
 			// TODO: delete corresponding category in the Requirements Bazaar
+			if(this.isConnectedToReqBaz()) {
+				ReqBazHelper.getInstance().deleteCategory(this.reqBazCategory, accessToken);
+			}
 		} catch (SQLException e) {
+			// roll back the whole stuff
+			connection.rollback();
+			throw e;
+		} catch (ReqBazException e) {
 			// roll back the whole stuff
 			connection.rollback();
 			throw e;
