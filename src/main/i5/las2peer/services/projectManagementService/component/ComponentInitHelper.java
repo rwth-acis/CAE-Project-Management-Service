@@ -67,7 +67,7 @@ public class ComponentInitHelper {
 	private static int createEmptyCommit(int versionedModelId, Connection connection) throws SQLException {
 		// create empty commit (this can be used to store model which is not yet commited)
 		PreparedStatement statement = connection
-				.prepareStatement("INSERT INTO Commit () VALUES ();", Statement.RETURN_GENERATED_KEYS);
+				.prepareStatement("INSERT INTO Commit (commitType) VALUES (0);", Statement.RETURN_GENERATED_KEYS);
 		statement.executeUpdate();
 	    ResultSet genKeys = statement.getGeneratedKeys();
 		genKeys.next();
