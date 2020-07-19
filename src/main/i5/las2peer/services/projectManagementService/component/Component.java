@@ -5,6 +5,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -261,6 +263,26 @@ public class Component {
 		
 		return jsonComponent;
 	}
+	
+	/**
+	 * Returns a list of all the components that are stored in the database.
+	 * @param connection Connection object
+	 * @return List of Component objects.
+	 * @throws SQLException If something with the database went wrong.
+	 * @throws ParseException If something (with parsing) while loading a component from the database went wrong.
+	 */
+	public static ArrayList<Component> getAllComponents(Connection connection) throws SQLException, ParseException {
+		ArrayList<Component> components = new ArrayList<>();
+		
+		PreparedStatement statement = connection.prepareStatement("SELECT id FROM Component");
+		ResultSet results = statement.executeQuery();
+		while(results.next()) {
+			components.add(new Component(results.getInt("id"), connection));
+		}
+		statement.close();
+		return components;
+	}
+	
 	
 	public int getId() {
 		return this.id;

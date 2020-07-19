@@ -1075,6 +1075,53 @@ public class RESTResources {
 		}
 	}
 	
+	/**
+	 * Searches for all components that exist in the database.
+	 * @return Response with status code and possibly error message. If no error occurs, then a list of components is returned.
+	 */
+	@GET
+	@Path("/components")
+	@Produces(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Returns a list of all components that exist in the database.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, returning list of all components."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response getAllComponents() {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getAllComponents called");
+     
+        Connection connection = null;
+	    try {
+		    connection = dbm.getConnection();
+		    
+		    // load list of all components from the database
+		    ArrayList<Component> allComponents = Component.getAllComponents(connection);
+		    
+		    // convert to JSONArray
+		    JSONArray a = new JSONArray();
+		    for(Component c : allComponents) {
+		    	a.add(c.toJSONObject());
+		    }
+		    // return as JSON string
+		    return Response.ok(a.toJSONString()).build();
+	    } catch (SQLException e) {
+        	logger.printStackTrace(e);
+        	return Response.serverError().entity("Internal server error.").build();
+        } catch (ParseException e) {
+        	logger.printStackTrace(e);
+        	return Response.serverError().entity("Internal server error.").build();
+		} finally {
+			try {
+				if(connection != null) connection.close();
+			} catch (SQLException e) {
+				logger.printStackTrace(e);
+				return Response.serverError().entity("Internal server error.").build();
+			}
+		}
+        
+	}
+		
+	
 	
 	/**
 	 * Method for retrieving the currently active user.
