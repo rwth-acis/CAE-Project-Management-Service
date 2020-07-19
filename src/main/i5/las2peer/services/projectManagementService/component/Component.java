@@ -133,6 +133,8 @@ public class Component {
 			int reqBazProjectId = queryResult.getInt("reqBazProjectId");
 			int reqBazCategoryId = queryResult.getInt("reqBazCategoryId");
 			this.reqBazCategory = new ReqBazCategory(reqBazCategoryId, reqBazProjectId);
+		} else {
+			throw new SQLException("No component found.");
 		}
 		statement.close();
 	}

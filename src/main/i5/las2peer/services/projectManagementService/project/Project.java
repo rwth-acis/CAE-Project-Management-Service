@@ -15,6 +15,7 @@ import org.json.simple.parser.ParseException;
 
 import i5.las2peer.services.projectManagementService.component.Component;
 import i5.las2peer.services.projectManagementService.component.ComponentType;
+import i5.las2peer.services.projectManagementService.component.Dependency;
 import i5.las2peer.services.projectManagementService.exception.GitHubException;
 import i5.las2peer.services.projectManagementService.exception.NoDefaultRoleFoundException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
@@ -67,6 +68,11 @@ public class Project {
     private ArrayList<Component> components;
     
     /**
+     * Dependencies, i.e. components of other projects that are included in this project.
+     */
+    private ArrayList<Dependency> dependencies;
+    
+    /**
      * Creates a project object from the given JSON string.
      * This constructor should be used before storing new projects.
      * Therefore, no project id need to be included in the JSON string yet.
@@ -87,6 +93,7 @@ public class Project {
     	
     	this.roleAssignment = new HashMap<>();
     	this.components = new ArrayList<>();
+    	this.dependencies = new ArrayList<>();
     }
     
     /**
@@ -155,6 +162,9 @@ public class Project {
 	    
 	    // load components
 	    loadComponents(connection);
+	    
+	    // load dependencies
+	    loadDependencies(connection);
 	}
 	
 	/**
@@ -233,6 +243,23 @@ public class Project {
 			} catch (ParseException e) {
 				e.printStackTrace();
 			}
+		}
+		
+		statement.close();
+	}
+	
+	private void loadDependencies(Connection connection) throws SQLException {
+		this.dependencies = new ArrayList<>();
+		
+		PreparedStatement statement = connection
+				.prepareStatement("SELECT Dependency.id FROM Dependency WHERE projectId = ?;");
+		statement.setInt(1, this.id);
+		
+		// execute query
+		ResultSet queryResult = statement.executeQuery();
+		
+		while(queryResult.next()) {
+			this.dependencies.add(new Dependency(queryResult.getInt(1), connection));
 		}
 		
 		statement.close();
@@ -756,6 +783,14 @@ public class Project {
 		return components;
 	}
 	
+	/**
+	 * Getter for the list of dependencies that the project includes.
+	 * @return ArrayList of dependencies that the project includes.
+	 */
+	public ArrayList<Dependency> getDependencies() {
+		return dependencies;
+	}
+	
 	public GitHubProject getGitHubProject() {
 		return this.gitHubProject;
 	}
@@ -769,6 +804,19 @@ public class Project {
 	public boolean hasComponent(int componentId) {
 		for(Component component : this.components) {
 			if(component.getId() == componentId) return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * Checks if the list of dependencies contains a component with
+	 * the given id.
+	 * @param componentId If of the component to search for.
+	 * @return Whether the component is included in the project as a dependency.
+	 */
+	public boolean hasDependency(int componentId) {
+		for(Dependency dependency : this.dependencies) {
+			if(dependency.getComponentId() == componentId) return true;
 		}
 		return false;
 	}
