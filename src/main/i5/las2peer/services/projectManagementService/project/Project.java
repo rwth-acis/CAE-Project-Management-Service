@@ -851,6 +851,27 @@ public class Project {
 	}
 	
 	/**
+	 * Removes the component-dependency with the given id from the project.
+	 * @param componentId Id of the component which should be removed from the project.
+	 * @param connection Connection object
+	 * @return True, if dependency could be removed. False, if dependency is not included in project and thus could not be removed.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public boolean removeDependency(int componentId, Connection connection) throws SQLException {
+		if(!hasDependency(componentId)) return false;
+		
+		PreparedStatement statement = connection
+				.prepareStatement("DELETE FROM Dependency WHERE componentId = ? AND projectId = ?;");
+		statement.setInt(1, componentId);
+		statement.setInt(2, this.id);
+		
+		// execute update and close statement
+		statement.executeUpdate();
+		statement.close();
+		return true;
+	}
+	
+	/**
 	 * Iterates over the list of roles of the project and returns the
 	 * one role which is marked as the default role.
 	 * @return Role object where isDefault is set to true.

@@ -993,6 +993,76 @@ public class RESTResources {
 	}
 	
 	/**
+	 * Removes the dependency with the given id from the project with the given id.
+	 * Therefore, the user sending the request needs to be a member of the project.
+	 * @param projectId Id of the project where the dependency should be removed from.
+	 * @param componentId Id of the component-dependency which should be removed from the project.
+	 * @return Response with status code (and possibly error message).
+	 */
+	@DELETE
+	@Path("/projects/{projectId}/dependencies/{componentId}")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Removes a dependency from a project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, removed dependency from project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to remove dependencies from it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or dependency to remove from project could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response removeProjectComponent(@PathParam("projectId") int projectId, @PathParam("componentId") int componentId) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE,
+				"removeProjectComponent: trying to remove component-dependency with id " + componentId +
+				" from project with id " + projectId);
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			// check if user is allowed to remove a dependency from the project
+			Connection connection = null;
+			try {
+			    connection = dbm.getConnection();
+			    
+			    User user = authManager.getUser();
+			    
+			    // get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is allowed to remove dependencies from the project
+			    	
+			    	boolean removed = project.removeDependency(componentId, connection);
+		    		if(removed) {
+		    			// removed dependency successfully
+		    			return Response.ok().build();
+		    		} else {
+		    			// dependency is not included in the project
+		    	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+		    	    			.entity("Dependency with the given id could not be found in the project.").build();
+		    		}
+			    } else {
+			    	// user does not have the permission to remove dependencies from the project
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to remove a dependency from it.").build();
+			    }
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	/**
 	 * Invites a user to a project.
 	 * @param projectId Id of the project where a user should be invited to.
 	 * @param inputUser JSON containing the loginName of the user that should be invited.
