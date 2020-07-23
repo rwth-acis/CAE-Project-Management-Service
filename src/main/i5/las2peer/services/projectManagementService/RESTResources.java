@@ -23,6 +23,7 @@ import i5.las2peer.logging.L2pLogger;
 import i5.las2peer.services.projectManagementService.auth.AuthManager;
 import i5.las2peer.services.projectManagementService.component.Component;
 import i5.las2peer.services.projectManagementService.component.Dependency;
+import i5.las2peer.services.projectManagementService.component.ExternalDependency;
 import i5.las2peer.services.projectManagementService.database.DatabaseManager;
 import i5.las2peer.services.projectManagementService.exception.GitHubException;
 import i5.las2peer.services.projectManagementService.exception.InvitationNotFoundException;
@@ -296,31 +297,34 @@ public class RESTResources {
 	}
 	
 	/**
-	 * Searches for projects in the database.
+	 * Searches for a project with the given id in the database.
 	 * Therefore, no authorization is needed.
-	 * @param projectName Project name to search for.
-	 * @return Response containing the status code (and a message or project list).
+	 * @param projectId Project id to search for.
+	 * @return Response containing the status code (and a message or project).
 	 */
 	@GET
-	@Path("/projects/{projectName}")
+	@Path("/projects/{projectId}")
 	@Produces(MediaType.APPLICATION_JSON)
-	@ApiOperation(value = "Searches for projects in the database.")
+	@ApiOperation(value = "Searches for a project with the given id in the database.")
 	@ApiResponses(value = {
-			@ApiResponse(code = HttpURLConnection.HTTP_OK, message="Found project(s) with the given name."),
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message="Found project with the given id."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message="Could not find project with given id."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
-	public Response searchProjects(@PathParam("projectName") String projectName) {
-		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProject: searching project(s) with name " + projectName);
+	public Response getProjectById(@PathParam("projectId") int projectId) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProject: searching project with id " + projectId);
 		
 		Connection connection = null;
 		try {
 			connection = dbm.getConnection();
 			
-			// search for projects
-			ArrayList<Project> projects = Project.searchProjects(projectName, connection);
+			// search for project
+			Project project = new Project(projectId, connection);
 			
 			// return JSONArray as string
-        	return Response.ok(Project.projectListToJSONArray(projects).toJSONString()).build();
+        	return Response.ok(project.toJSONObject().toJSONString()).build();
+		} catch (ProjectNotFoundException e) {
+			return Response.status(HttpURLConnection.HTTP_NOT_FOUND).build();
 		} catch (SQLException e) {
 			logger.printStackTrace(e);
 			return Response.serverError().entity("Internal server error.").build();
@@ -1010,7 +1014,7 @@ public class RESTResources {
 	})
 	public Response removeProjectDependency(@PathParam("projectId") int projectId, @PathParam("componentId") int componentId) {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE,
-				"removeProjectComponent: trying to remove component-dependency with id " + componentId +
+				"removeProjectDependency: trying to remove component-dependency with id " + componentId +
 				" from project with id " + projectId);
 		
 		if(authManager.isAnonymous()) {
@@ -1042,6 +1046,191 @@ public class RESTResources {
 			    	// user does not have the permission to remove dependencies from the project
 			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
 			    			.entity("User needs to be member of the project to remove a dependency from it.").build();
+			    }
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Adds an external dependency to a project.
+	 * @param projectId Id of the project where an external dependency should be added to.
+	 * @param inputExternalDependency JSON object containing the GitHub URL where the external dependency is hosted.
+	 * @return Response with status code (and possibly an error description).
+	 */
+	@POST
+	@Path("/projects/{projectId}/extdependencies")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Adds external dependency to project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, added external dependency to the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized to add external dependency to project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User needs to be member of the project to add external dependencies to it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response postProjectExternalDependency(@PathParam("projectId") int projectId, String inputExternalDependency) {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "postProjectExternalDependency: trying to add external dependency to project");
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			// check if user is allowed to add an external dependency to the project
+			Connection connection = null;
+			try {
+			    connection = dbm.getConnection();
+									    
+				User user = authManager.getUser();
+									    
+				// get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is member of the project and thus allowed to add external dependencies to it
+			        
+			    	JSONObject json = (JSONObject) JSONValue.parse(inputExternalDependency);
+			    	String gitHubURL = (String) json.get("gitHubURL");
+			    	
+			    	ExternalDependency externalDependency = new ExternalDependency(projectId, gitHubURL);
+			    	externalDependency.persist(connection);
+			    	
+			    	return Response.ok().build();
+			    } else {
+			    	// user is no member of the project and thus not allowed to add external dependencies to it
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to add external dependencies to it.").build();
+			    }
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Lists the external dependencies of the project.
+	 * @param projectId Id of the project where the external dependencies should be listed.
+	 * @return Response with status (and possibly error message).
+	 */
+	@GET
+	@Path("/projects/{projectId}/extdependencies")
+	@ApiOperation(value = "Lists the external dependencies of the project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, returns list of external dependencies of the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response getProjectExternalDependencies(@PathParam("projectId") int projectId) {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProjectExternalDependencies: trying to get external dependencies of project with id " + projectId);
+		
+        Connection connection = null;
+		try {
+			connection = dbm.getConnection();
+			
+			// load project by id
+			Project project = new Project(projectId, connection);
+			
+			// get external dependencies of the project
+			ArrayList<ExternalDependency> externalDependencies = project.getExternalDependencies();
+			
+			// create JSONArray of the ArrayList
+			JSONArray jsonExternalDependencies = new JSONArray();
+			for(ExternalDependency externalDependency : externalDependencies) {
+				jsonExternalDependencies.add(externalDependency.toJSONObject());
+			}
+			
+			// return JSONArray as string
+        	return Response.ok(jsonExternalDependencies.toJSONString()).build();
+		} catch (ProjectNotFoundException e) {
+			logger.printStackTrace(e);
+			return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+					.entity("Project with the given id could not be found.").build();
+		} catch (SQLException e) {
+			logger.printStackTrace(e);
+			return Response.serverError().entity("Internal server error.").build();
+		} finally {
+			try {
+			    connection.close();
+			} catch (SQLException e) {
+				logger.printStackTrace(e);
+			}
+		}
+	}
+	
+	/**
+	 * Removes the external dependency with the given id from the project with the given id.
+	 * Therefore, the user sending the request needs to be a member of the project.
+	 * @param projectId Id of the project where the external dependency should be removed from.
+	 * @param externalDependencyId Id of the external dependency which should be removed from the project.
+	 * @return Response with status code (and possibly error message).
+	 */
+	@DELETE
+	@Path("/projects/{projectId}/extdependencies/{externalDependencyId}")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Removes an external dependency from a project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, removed external dependency from project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to remove external dependencies from it."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or external dependency to remove from project could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response removeProjectExternalDependency(@PathParam("projectId") int projectId, @PathParam("externalDependencyId") int externalDependencyId) {
+		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE,
+				"removeProjectExternalDependency: trying to remove external dependency with id " + externalDependencyId +
+				" from project with id " + projectId);
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			// check if user is allowed to remove an external dependency from the project
+			Connection connection = null;
+			try {
+			    connection = dbm.getConnection();
+			    
+			    User user = authManager.getUser();
+			    
+			    // get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is allowed to remove external dependencies from the project
+			    	
+			    	boolean removed = project.removeExternalDependency(externalDependencyId, connection);
+		    		if(removed) {
+		    			// removed external dependency successfully
+		    			return Response.ok().build();
+		    		} else {
+		    			// external dependency is not included in the project
+		    	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+		    	    			.entity("External dependency with the given id could not be found in the project.").build();
+		    		}
+			    } else {
+			    	// user does not have the permission to remove external dependencies from the project
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to remove an external dependency from it.").build();
 			    }
 			} catch (ProjectNotFoundException e) {
 				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)

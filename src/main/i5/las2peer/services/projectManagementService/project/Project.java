@@ -16,6 +16,7 @@ import org.json.simple.parser.ParseException;
 import i5.las2peer.services.projectManagementService.component.Component;
 import i5.las2peer.services.projectManagementService.component.ComponentType;
 import i5.las2peer.services.projectManagementService.component.Dependency;
+import i5.las2peer.services.projectManagementService.component.ExternalDependency;
 import i5.las2peer.services.projectManagementService.exception.GitHubException;
 import i5.las2peer.services.projectManagementService.exception.NoDefaultRoleFoundException;
 import i5.las2peer.services.projectManagementService.exception.ProjectNotFoundException;
@@ -73,6 +74,11 @@ public class Project {
     private ArrayList<Dependency> dependencies;
     
     /**
+     * ExternalDependencies, i.e. components from GitHub that are included in this project.
+     */
+    private ArrayList<ExternalDependency> externalDependencies;
+    
+    /**
      * Creates a project object from the given JSON string.
      * This constructor should be used before storing new projects.
      * Therefore, no project id need to be included in the JSON string yet.
@@ -94,6 +100,7 @@ public class Project {
     	this.roleAssignment = new HashMap<>();
     	this.components = new ArrayList<>();
     	this.dependencies = new ArrayList<>();
+    	this.externalDependencies = new ArrayList<>();
     }
     
     /**
@@ -165,6 +172,9 @@ public class Project {
 	    
 	    // load dependencies
 	    loadDependencies(connection);
+	    
+	    // load external dependencies
+	    loadExternalDependencies(connection);
 	}
 	
 	/**
@@ -260,6 +270,23 @@ public class Project {
 		
 		while(queryResult.next()) {
 			this.dependencies.add(new Dependency(queryResult.getInt(1), connection));
+		}
+		
+		statement.close();
+	}
+	
+	private void loadExternalDependencies(Connection connection) throws SQLException {
+		this.externalDependencies = new ArrayList<>();
+		
+		PreparedStatement statement = connection
+				.prepareStatement("SELECT ExternalDependency.id FROM ExternalDependency WHERE projectId = ?;");
+		statement.setInt(1, this.id);
+		
+		// execute query
+		ResultSet queryResult = statement.executeQuery();
+		
+		while(queryResult.next()) {
+			this.externalDependencies.add(new ExternalDependency(queryResult.getInt(1), connection));
 		}
 		
 		statement.close();
@@ -447,6 +474,8 @@ public class Project {
 				    component.delete(connection, accessToken);
 				}
 			}
+			
+			// dependencies and external dependencies of the project should automatically get deleted
 		} catch (GitHubException e) {
 			// roll back the whole stuff
 			connection.rollback();
@@ -510,6 +539,20 @@ public class Project {
 			jsonComponents.add(component.toJSONObject());
 		}
 		jsonProject.put("components", jsonComponents);
+		
+		// put dependencies
+		JSONArray jsonDependencies = new JSONArray();
+		for(Dependency dependency : dependencies) {
+			jsonDependencies.add(dependency.toJSONObject());
+		}
+		jsonProject.put("dependencies", jsonDependencies);
+		
+		// put external dependencies
+		JSONArray jsonExternalDependencies = new JSONArray();
+		for(ExternalDependency externalDependency : externalDependencies) {
+			jsonExternalDependencies.add(externalDependency.toJSONObject());
+		}
+		jsonProject.put("externalDependencies", jsonExternalDependencies);
 
 		return jsonProject;
 	}
@@ -791,6 +834,14 @@ public class Project {
 		return dependencies;
 	}
 	
+	/**
+	 * Getter for the list of external dependencies that the project includes.
+	 * @return ArrayList of external dependencies that the project includes.
+	 */
+	public ArrayList<ExternalDependency> getExternalDependencies() {
+		return externalDependencies;
+	}
+	
 	public GitHubProject getGitHubProject() {
 		return this.gitHubProject;
 	}
@@ -817,6 +868,18 @@ public class Project {
 	public boolean hasDependency(int componentId) {
 		for(Dependency dependency : this.dependencies) {
 			if(dependency.getComponentId() == componentId) return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * Checks if the list of external dependencies contains an entry with the given id.
+	 * @param externalDependencyId Id of the external dependency to search for.
+	 * @return Whether the external dependency is included in the project.
+	 */
+	public boolean hasExternalDependency(int externalDependencyId) {
+		for(ExternalDependency externalDependency : this.externalDependencies) {
+			if(externalDependency.getId() == externalDependencyId) return true;
 		}
 		return false;
 	}
@@ -849,7 +912,7 @@ public class Project {
 		statement.executeUpdate();
 		statement.close();
 		return true;
-	}
+	}	
 	
 	/**
 	 * Removes the component-dependency with the given id from the project.
@@ -864,6 +927,27 @@ public class Project {
 		PreparedStatement statement = connection
 				.prepareStatement("DELETE FROM Dependency WHERE componentId = ? AND projectId = ?;");
 		statement.setInt(1, componentId);
+		statement.setInt(2, this.id);
+		
+		// execute update and close statement
+		statement.executeUpdate();
+		statement.close();
+		return true;
+	}
+	
+	/**
+	 * Removes the external dependency with the given id from the project.
+	 * @param externalDependencyId Id of the external dependency which should be removed from the project.
+	 * @param connection Connection object
+	 * @return True, if external dependency could be removed. False, if external dependency is not included in project and thus could not be removed.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public boolean removeExternalDependency(int externalDependencyId, Connection connection) throws SQLException {
+		if(!hasExternalDependency(externalDependencyId)) return false;
+		
+		PreparedStatement statement = connection
+				.prepareStatement("DELETE FROM ExternalDependency WHERE id = ? AND projectId = ?;");
+		statement.setInt(1, externalDependencyId);
 		statement.setInt(2, this.id);
 		
 		// execute update and close statement
