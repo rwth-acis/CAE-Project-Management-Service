@@ -783,11 +783,9 @@ public class RESTResources {
 	 * Removes the component with the given id from the project with the given id.
 	 * Therefore, the user sending the request needs to be a member of the project.
 	 * Access token needs to be sent in the method body.
-	 * Note: Currently, the component will not be deleted, since it might be used as a dependency
-	 * somewhere else. Right now only the entry in the ProjectToComponent table gets removed.
-	 * TODO: When dependencies are included, then this method needs to be updated: Check if component
-	 * that should be deleted is used as a dependency somewhere. If not, then remove the component too 
-	 * (and not only the ProjectToComponent entry).
+	 * 
+	 * If the component is not used somewhere else anymore (e.g. as a dependency), then it gets removed 
+	 * from the CAE.
 	 * @param projectId Id of the project where the component should be removed from.
 	 * @param componentId Id of the component which should be removed from the project.
 	 * @return Response with status code (and possibly error message).
@@ -1010,7 +1008,7 @@ public class RESTResources {
 			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or dependency to remove from project could not be found."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
-	public Response removeProjectComponent(@PathParam("projectId") int projectId, @PathParam("componentId") int componentId) {
+	public Response removeProjectDependency(@PathParam("projectId") int projectId, @PathParam("componentId") int componentId) {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE,
 				"removeProjectComponent: trying to remove component-dependency with id " + componentId +
 				" from project with id " + projectId);

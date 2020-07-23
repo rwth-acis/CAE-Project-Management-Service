@@ -285,6 +285,41 @@ public class Component {
 		return components;
 	}
 	
+	/**
+	 * Checks whether the component is used in a project directly or as a dependency.
+	 * @param connection Connection object
+	 * @return Whether the component is used in a project directly or as a dependency.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public boolean isUsed(Connection connection) throws SQLException {
+		boolean used = false;
+		
+		// check if it is used in a project (directly)
+		PreparedStatement statement = connection.prepareStatement("SELECT * FROM ProjectToComponent WHERE componentId = ?;");
+		statement.setInt(1, this.id);
+		ResultSet result = statement.executeQuery();
+		if(result.next()) {
+			used = true;
+		}
+		statement.close();
+		result.close();
+		if(used) return true;
+		
+		// check if it is used in a project as a dependency
+	    statement = connection.prepareStatement("SELECT * FROM Dependency WHERE componentId = ?;");
+		statement.setInt(1, this.id);
+		result = statement.executeQuery();
+		if(result.next()) {
+			used = true;
+		}
+		statement.close();
+		result.close();
+		if(used) return true;
+		
+		// component is not used in a project directly or as a dependency
+		return false;
+	}
+	
 	
 	public int getId() {
 		return this.id;

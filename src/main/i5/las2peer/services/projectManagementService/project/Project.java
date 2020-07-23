@@ -418,9 +418,7 @@ public class Project {
 	 * Entries of ProjectToUser are also deleted automatically.
 	 * 
 	 * The connections to the components are also deleted automatically from 
-	 * the database, but the components currently remain in the database.
-	 * TODO: Later, when dependencies are working, then components of the project 
-	 * may be deleted too, if they are not used as a dependency somewhere else.
+	 * the database and the components are deleted if they are not used somewhere anymore.
 	 * @param connection Connection object
 	 * @param accessToken Access Token of the user needed to access the Requirements Bazaar API.
 	 * @throws SQLException If something with the database went wrong.
@@ -442,10 +440,12 @@ public class Project {
 			// also delete the corresponding GitHub project
 			GitHubHelper.getInstance().deleteGitHubProject(this.getGitHubProject());
 			
-			// currently, just delete every component
-			// TODO: only delete components, if they are not used as a dependency
+			// delete components of the project, if they are not used as a dependency
 			for(Component component : this.components) {
-				component.delete(connection, accessToken);
+				if(!component.isUsed(connection)) {
+					// component is not used anymore in the CAE
+				    component.delete(connection, accessToken);
+				}
 			}
 		} catch (GitHubException e) {
 			// roll back the whole stuff
@@ -822,7 +822,7 @@ public class Project {
 	}
 	
 	/**
-	 * Removes the component with the given id from the project.
+	 * Removes the component with the given id from the project, if it is not used somewhere in the CAE anymore.
 	 * @param componentId Id of the component which should be removed from the project.
 	 * @param connection Connection object
 	 * @param accessToken Access token to access the Requirements Bazaar API.
@@ -839,10 +839,11 @@ public class Project {
 		statement.setInt(1, this.id);
 		statement.setInt(2, componentId);
 		
-		// delete the component
-		// TODO: only delete it, if it is not used as a dependency somewhere
 		Component component = new Component(componentId, connection);
-		component.delete(connection, accessToken);
+		// only delete the component, if it is not used as a dependency somewhere
+		if(!component.isUsed(connection)) {
+		    component.delete(connection, accessToken);
+		}
 		
 		// execute update and close statement
 		statement.executeUpdate();
