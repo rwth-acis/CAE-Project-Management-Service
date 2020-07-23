@@ -1077,7 +1077,7 @@ public class RESTResources {
 	@ApiResponses(value = {
 			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, added external dependency to the project."),
 			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized to add external dependency to project."),
-			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found or GitHub repo does not exist."),
 			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User needs to be member of the project to add external dependencies to it."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
@@ -1103,6 +1103,12 @@ public class RESTResources {
 			    	JSONObject json = (JSONObject) JSONValue.parse(inputExternalDependency);
 			    	String gitHubURL = (String) json.get("gitHubURL");
 			    	
+			    	// check if repo exists
+			    	if(!GitHubHelper.getInstance().repoExists(gitHubURL)) {
+			    		return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+			    				.entity("GitHub repository does not exist.").build();
+			    	}
+			    	
 			    	ExternalDependency externalDependency = new ExternalDependency(projectId, gitHubURL);
 			    	externalDependency.persist(connection);
 			    	
@@ -1118,7 +1124,10 @@ public class RESTResources {
 			} catch (SQLException e) {
             	logger.printStackTrace(e);
             	return Response.serverError().entity("Internal server error.").build();
-            } finally {
+            } catch (GitHubException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+			} finally {
 				try {
 					if(connection != null) connection.close();
 				} catch (SQLException e) {

@@ -158,6 +158,31 @@ public class GitHubHelper {
 	}
 
 	/**
+	 * Checks if the repository with the given URL exists.
+	 * Note: To work correct, the GitHub URL which is given, needs to be correct.
+	 * @param gitHubURL GitHub URL to a repository.
+	 * @return
+	 * @throws GitHubException
+	 */
+	public boolean repoExists(String gitHubURL) throws GitHubException {
+		URL url;
+		try {
+			url = new URL(gitHubURL);
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("GET");
+			connection.connect();
+			
+			return connection.getResponseCode() == HttpURLConnection.HTTP_OK;
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		}
+	}
+	
+	/**
 	 * Creates a GitHub project in the GitHub organization given by the properties file.
 	 * @param projectName Name of the GitHub project.
 	 * @return The newly created GitHubProject object.
