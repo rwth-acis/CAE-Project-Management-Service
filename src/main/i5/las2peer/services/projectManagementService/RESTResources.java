@@ -1,5 +1,6 @@
 package i5.las2peer.services.projectManagementService;
 
+import java.io.Serializable;
 import java.net.HttpURLConnection;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -73,6 +74,7 @@ import org.json.simple.parser.ParseException;
 @Path("/")
 public class RESTResources {
 	
+	private static final String MODEL_PERSISTENCE_SERVICE = "i5.las2peer.services.modelPersistenceService.ModelPersistenceService@0.1";
 	private final ProjectManagementService service = (ProjectManagementService) Context.getCurrent().getService();
 	private L2pLogger logger;
 	private DatabaseManager dbm;
@@ -734,7 +736,7 @@ public class RESTResources {
 	}
 	
 	/**
-	 * Lists the components of the project.
+	 * Lists the components, dependencies and external dependencies of the project.
 	 * @param projectId Id of the project where the components should be listed.
 	 * @return Response with status (and possibly error message).
 	 */
@@ -742,7 +744,7 @@ public class RESTResources {
 	@Path("/projects/{projectId}/components")
 	@ApiOperation(value = "Lists the components of the project.")
 	@ApiResponses(value = {
-			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, returns list of components of the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, returns list of components, dependencies and external dependencies of the project."),
 			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
@@ -762,7 +764,14 @@ public class RESTResources {
 			ArrayList<Component> components = project.getComponents();
 			JSONArray jsonComponents = new JSONArray();
 			for(Component component : components) {
-				jsonComponents.add(component.toJSONObject());
+				JSONObject jsonComponent = component.toJSONObject();
+				
+				// also get version tags that are available for this component
+				Serializable[] params = {component.getVersionedModelId()};
+				ArrayList<String> versions = (ArrayList<String>) Context.getCurrent().invoke(MODEL_PERSISTENCE_SERVICE, "getVersionsOfVersionedModel", params);
+			    jsonComponent.put("versions", versions);
+				
+				jsonComponents.add(jsonComponent);
 			}
 			result.put("components", jsonComponents);
 			
@@ -770,9 +779,26 @@ public class RESTResources {
 			ArrayList<Dependency> dependencies = project.getDependencies();
 			JSONArray jsonDependencies = new JSONArray();
 			for(Dependency dependency : dependencies) {
-				jsonDependencies.add(dependency.toJSONObject());
+				JSONObject jsonDependency = dependency.toJSONObject();
+				JSONObject jsonComponent = (JSONObject) jsonDependency.get("component");
+				
+				// also get version tags that are available for the component of this dependency
+				Serializable[] params = {dependency.getComponent().getVersionedModelId()};
+				ArrayList<String> versions = (ArrayList<String>) Context.getCurrent().invoke(MODEL_PERSISTENCE_SERVICE, "getVersionsOfVersionedModel", params);
+				jsonComponent.put("versions", versions);
+				jsonDependency.put("component", jsonComponent);
+				
+				jsonDependencies.add(jsonDependency);
 			}
 			result.put("dependencies", jsonDependencies);
+			
+			// get external dependencies of the project
+			ArrayList<ExternalDependency> externalDependencies = project.getExternalDependencies();
+			JSONArray jsonExternalDependencies = new JSONArray();
+			for(ExternalDependency externalDependency : externalDependencies) {
+				jsonExternalDependencies.add(externalDependency.toJSONObject());
+			}
+			result.put("externalDependencies", jsonExternalDependencies);
 			
 			// return result as string
         	return Response.ok(result.toJSONString()).build();
@@ -783,7 +809,10 @@ public class RESTResources {
 		} catch (SQLException e) {
 			logger.printStackTrace(e);
 			return Response.serverError().entity("Internal server error.").build();
-		} finally {
+		} catch (Exception e) {
+			logger.printStackTrace(e);
+			return Response.serverError().entity("Internal server error.").build();
+		}  finally {
 			try {
 			    connection.close();
 			} catch (SQLException e) {
@@ -1093,56 +1122,6 @@ public class RESTResources {
 					logger.printStackTrace(e);
 					return Response.serverError().entity("Internal server error.").build();
 				}
-			}
-		}
-	}
-	
-	/**
-	 * Lists the external dependencies of the project.
-	 * @param projectId Id of the project where the external dependencies should be listed.
-	 * @return Response with status (and possibly error message).
-	 */
-	@GET
-	@Path("/projects/{projectId}/extdependencies")
-	@ApiOperation(value = "Lists the external dependencies of the project.")
-	@ApiResponses(value = {
-			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, returns list of external dependencies of the project."),
-			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
-			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
-	})
-	public Response getProjectExternalDependencies(@PathParam("projectId") int projectId) {
-        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProjectExternalDependencies: trying to get external dependencies of project with id " + projectId);
-		
-        Connection connection = null;
-		try {
-			connection = dbm.getConnection();
-			
-			// load project by id
-			Project project = new Project(projectId, connection);
-			
-			// get external dependencies of the project
-			ArrayList<ExternalDependency> externalDependencies = project.getExternalDependencies();
-			
-			// create JSONArray of the ArrayList
-			JSONArray jsonExternalDependencies = new JSONArray();
-			for(ExternalDependency externalDependency : externalDependencies) {
-				jsonExternalDependencies.add(externalDependency.toJSONObject());
-			}
-			
-			// return JSONArray as string
-        	return Response.ok(jsonExternalDependencies.toJSONString()).build();
-		} catch (ProjectNotFoundException e) {
-			logger.printStackTrace(e);
-			return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
-					.entity("Project with the given id could not be found.").build();
-		} catch (SQLException e) {
-			logger.printStackTrace(e);
-			return Response.serverError().entity("Internal server error.").build();
-		} finally {
-			try {
-			    connection.close();
-			} catch (SQLException e) {
-				logger.printStackTrace(e);
 			}
 		}
 	}

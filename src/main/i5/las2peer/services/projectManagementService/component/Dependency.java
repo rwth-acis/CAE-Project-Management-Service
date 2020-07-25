@@ -104,4 +104,8 @@ public class Dependency {
 	public int getComponentId() {
 		return this.componentId;
 	}
+	
+	public Component getComponent() {
+		return this.component;
+	}
 }
