@@ -796,7 +796,15 @@ public class RESTResources {
 			ArrayList<ExternalDependency> externalDependencies = project.getExternalDependencies();
 			JSONArray jsonExternalDependencies = new JSONArray();
 			for(ExternalDependency externalDependency : externalDependencies) {
-				jsonExternalDependencies.add(externalDependency.toJSONObject());
+				JSONObject jsonExtDependency = externalDependency.toJSONObject();
+				
+				// get version tags from GitHub API
+				ArrayList<String> versions = GitHubHelper.getInstance()
+						.getRepoVersionTags(externalDependency.getGitHubRepoOwner(), externalDependency.getGitHubRepoName());
+				
+				jsonExtDependency.put("versions", versions);
+				
+				jsonExternalDependencies.add(jsonExtDependency);
 			}
 			result.put("externalDependencies", jsonExternalDependencies);
 			

@@ -6,7 +6,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import org.json.simple.JSONObject;
-import org.json.simple.parser.ParseException;
 
 public class ExternalDependency {
 	
@@ -83,6 +82,16 @@ public class ExternalDependency {
 	
 	public int getId() {
 		return this.id;
+	}
+	
+	public String getGitHubRepoOwner() {
+		return this.gitHubURL.split(".com/")[1].split("/")[0];
+	}
+	
+	public String getGitHubRepoName() {
+		String repoName = this.gitHubURL.split(".com/")[1].split("/")[1];
+		if(repoName.endsWith(".git")) repoName = repoName.replace(".git", "");
+		return repoName;
 	}
 
 }

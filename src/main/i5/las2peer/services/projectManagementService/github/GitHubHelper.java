@@ -9,11 +9,13 @@ import java.lang.reflect.Modifier;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
@@ -177,6 +179,51 @@ public class GitHubHelper {
 			e.printStackTrace();
 			throw new GitHubException(e.getMessage());
 		} catch (IOException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		}
+	}
+	
+	/**
+	 * Returns an ArrayList containing the version tags of the given repository as strings.
+	 * @param repoOwner Owner/account on GitHub where the repository is hosted.
+	 * @param repoName Name of the GitHub repository.
+	 * @return ArrayList containing the version tags of the repository as strings.
+	 * @throws GitHubException If something with the API request went wrong.
+	 */
+	public ArrayList<String> getRepoVersionTags(String repoOwner, String repoName) throws GitHubException {
+		ArrayList<String> tags = new ArrayList<>();
+		URL url;
+		try {
+			url = new URL(API_BASE_URL + "/repos/" + repoOwner + "/" + repoName + "/tags");
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("GET");
+			connection.setDoInput(true);
+			connection.connect();
+			
+			// forward (in case of) error
+			if (connection.getResponseCode() != 200) {
+				String message = getErrorMessage(connection);
+				throw new GitHubException(message);
+			} else {
+				// get response
+				String response = getResponseBody(connection);
+							
+				// convert to JSONObject
+				JSONArray json = (JSONArray) JSONValue.parseWithException(response);
+				for(Object o : json) {
+					JSONObject tag = (JSONObject) o;
+					tags.add((String) tag.get("name"));
+				}
+				return tags;
+			}
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		} catch (ParseException e) {
 			e.printStackTrace();
 			throw new GitHubException(e.getMessage());
 		}
