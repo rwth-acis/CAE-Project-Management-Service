@@ -756,17 +756,26 @@ public class RESTResources {
 			// load project by id
 			Project project = new Project(projectId, connection);
 			
+			JSONObject result = new JSONObject();
+			
 			// get components of the project
 			ArrayList<Component> components = project.getComponents();
-			
-			// create JSONArray of the ArrayList
 			JSONArray jsonComponents = new JSONArray();
 			for(Component component : components) {
 				jsonComponents.add(component.toJSONObject());
 			}
+			result.put("components", jsonComponents);
 			
-			// return JSONArray as string
-        	return Response.ok(jsonComponents.toJSONString()).build();
+			// get dependencies of the project
+			ArrayList<Dependency> dependencies = project.getDependencies();
+			JSONArray jsonDependencies = new JSONArray();
+			for(Dependency dependency : dependencies) {
+				jsonDependencies.add(dependency.toJSONObject());
+			}
+			result.put("dependencies", jsonDependencies);
+			
+			// return result as string
+        	return Response.ok(result.toJSONString()).build();
 		} catch (ProjectNotFoundException e) {
 			logger.printStackTrace(e);
 			return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
@@ -940,56 +949,6 @@ public class RESTResources {
 					logger.printStackTrace(e);
 					return Response.serverError().entity("Internal server error.").build();
 				}
-			}
-		}
-	}
-	
-	/**
-	 * Lists the dependencies of the project.
-	 * @param projectId Id of the project where the dependencies should be listed.
-	 * @return Response with status (and possibly error message).
-	 */
-	@GET
-	@Path("/projects/{projectId}/dependencies")
-	@ApiOperation(value = "Lists the dependencies of the project.")
-	@ApiResponses(value = {
-			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, returns list of dependencies of the project."),
-			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id could not be found."),
-			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
-	})
-	public Response getProjectDependencies(@PathParam("projectId") int projectId) {
-        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "getProjectDependencies: trying to get dependencies of project with id " + projectId);
-		
-        Connection connection = null;
-		try {
-			connection = dbm.getConnection();
-			
-			// load project by id
-			Project project = new Project(projectId, connection);
-			
-			// get dependencies of the project
-			ArrayList<Dependency> dependencies = project.getDependencies();
-			
-			// create JSONArray of the ArrayList
-			JSONArray jsonDependencies = new JSONArray();
-			for(Dependency dependency : dependencies) {
-				jsonDependencies.add(dependency.toJSONObject());
-			}
-			
-			// return JSONArray as string
-        	return Response.ok(jsonDependencies.toJSONString()).build();
-		} catch (ProjectNotFoundException e) {
-			logger.printStackTrace(e);
-			return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
-					.entity("Project with the given id could not be found.").build();
-		} catch (SQLException e) {
-			logger.printStackTrace(e);
-			return Response.serverError().entity("Internal server error.").build();
-		} finally {
-			try {
-			    connection.close();
-			} catch (SQLException e) {
-				logger.printStackTrace(e);
 			}
 		}
 	}
