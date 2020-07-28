@@ -1098,6 +1098,7 @@ public class RESTResources {
 			        
 			    	JSONObject json = (JSONObject) JSONValue.parse(inputExternalDependency);
 			    	String gitHubURL = (String) json.get("gitHubURL");
+			    	String type = (String) json.get("type");
 			    	
 			    	// check if repo exists
 			    	if(!GitHubHelper.getInstance().repoExists(gitHubURL)) {
@@ -1105,7 +1106,7 @@ public class RESTResources {
 			    				.entity("GitHub repository does not exist.").build();
 			    	}
 			    	
-			    	ExternalDependency externalDependency = new ExternalDependency(projectId, gitHubURL);
+			    	ExternalDependency externalDependency = new ExternalDependency(projectId, gitHubURL, type);
 			    	externalDependency.persist(connection);
 			    	
 			    	return Response.ok().build();

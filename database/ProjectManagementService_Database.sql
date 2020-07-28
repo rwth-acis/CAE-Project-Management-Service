@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS commedit.ExternalDependency (
   id INT NOT NULL AUTO_INCREMENT,
   projectId INT NOT NULL,
   gitHubURL VARCHAR(255) NOT NULL,
+  type VARCHAR(255) NOT NULL,
   CONSTRAINT externalDependencyPK PRIMARY KEY (id),
   CONSTRAINT externalDependencyProjectFK FOREIGN KEY (projectId) REFERENCES commedit.Project(id) ON DELETE CASCADE
 );

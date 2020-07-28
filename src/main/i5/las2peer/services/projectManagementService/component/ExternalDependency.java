@@ -25,13 +25,20 @@ public class ExternalDependency {
 	private String gitHubURL;
 	
 	/**
+	 * Type, either "frontend" or "microservice".
+	 */
+	private String type;
+	
+	/**
 	 * Constructor that creates a new ExternalDependency object from the given project id and GitHub URL.
 	 * @param projectId Id of the project, where the external dependency should be added to.
 	 * @param gitHubURL URL to the corresponding GitHub repository.
+	 * @param type Type of the external dependencies.
 	 */
-	public ExternalDependency(int projectId, String gitHubURL) {
+	public ExternalDependency(int projectId, String gitHubURL, String type) {
 		this.projectId = projectId;
 		this.gitHubURL = gitHubURL;
+		this.type = type;
 	}
 	
 	/**
@@ -48,6 +55,7 @@ public class ExternalDependency {
 		if(result.next()) {
 			this.projectId = result.getInt("projectId");
 			this.gitHubURL = result.getString("gitHubURL");
+			this.type = result.getString("type");
 		}
 		
 		statement.close();
@@ -59,9 +67,11 @@ public class ExternalDependency {
 	 * @throws SQLException If something with the database went wrong.
 	 */
 	public void persist(Connection connection) throws SQLException {
-	    PreparedStatement statement = connection.prepareStatement("INSERT INTO ExternalDependency (projectId, gitHubURL) VALUES (?,?);");
+	    PreparedStatement statement = connection
+	    		.prepareStatement("INSERT INTO ExternalDependency (projectId, gitHubURL, type) VALUES (?,?,?);");
 	    statement.setInt(1, this.projectId);
 	    statement.setString(2, this.gitHubURL);
+	    statement.setString(3, this.type);
 	    statement.executeUpdate();
 	    statement.close();
 	}
@@ -76,6 +86,7 @@ public class ExternalDependency {
 		
 		jsonExternalDependency.put("externalDependencyId", this.id);
 		jsonExternalDependency.put("gitHubURL", this.gitHubURL);
+		jsonExternalDependency.put("type", this.type);
 		
 		return jsonExternalDependency;
 	}
