@@ -42,6 +42,11 @@ public class User {
 	private String gitHubUsername;
 	
 	/**
+	 * Access Token used to communicate with the GitHub API, e.g. for GitHub projects.
+	 */
+	private String gitHubAccessToken;
+	
+	/**
 	 * Sets parameters except for the id.
 	 * Can be used before persisting the user.
 	 * @param email Email of the user that should be created.
@@ -104,6 +109,25 @@ public class User {
 	}
 	
 	/**
+	 * Updates the GitHub access token of the user in the database.
+	 * @param accessToken GitHub access token that should be stored into the database.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public void putGitHubAccessToken(String accessToken, Connection connection) throws SQLException {
+		this.gitHubAccessToken = accessToken;
+		
+		// insert to database
+		PreparedStatement statement = connection.prepareStatement("UPDATE User SET gitHubAccessToken = ? WHERE id = ?;");
+		statement.setString(1, this.gitHubAccessToken);
+		statement.setInt(2, this.id);
+		
+		// execute update
+		statement.executeUpdate();
+		statement.close();
+	}
+	
+	/**
 	 * Method for loading user by given email from database.
 	 * @param email Email of user to search for.
 	 * @param connection a Connection object
@@ -123,6 +147,7 @@ public class User {
 			this.id = queryResult.getInt(1);
 			this.loginName = queryResult.getString("loginName");
 			this.gitHubUsername = queryResult.getString("gitHubUsername");
+			this.gitHubAccessToken = queryResult.getString("gitHubAccessToken");
 		} else {
 			// there does not exist a user with the given email in the database
 			throw new UserNotFoundException();
@@ -190,6 +215,7 @@ public class User {
 		jsonUser.put("loginName", this.loginName);
 		jsonUser.put("email", this.email);
 		jsonUser.put("gitHubUsername", this.gitHubUsername);
+		jsonUser.put("gitHubAccessToken", this.gitHubAccessToken);
 
 		return jsonUser;
 	}

@@ -45,6 +45,12 @@ public class ProjectManagementService extends RESTService {
 	private String gitHubOrganization;
 	
 	/*
+	 * GitHub OAuth data
+	 */
+    private String gitHubOAuthClientId;
+    private String gitHubOAuthClientSecret;
+	
+	/*
 	 * Requirements Bazaar configuration.
 	 */
 	private String reqBazBackendUrl;
@@ -64,6 +70,8 @@ public class ProjectManagementService extends RESTService {
 		gitHubHelper.setGitHubUser(this.gitHubUser);
 		gitHubHelper.setGitHubPassword(this.gitHubPassword);
 		gitHubHelper.setGitHubOrganization(this.gitHubOrganization);
+		gitHubHelper.setOAuthClientId(this.gitHubOAuthClientId);
+		gitHubHelper.setOAuthClientSecret(this.gitHubOAuthClientSecret);
 		
 		// setup ReqBazHelper
 		ReqBazHelper reqBazHelper = ReqBazHelper.getInstance();

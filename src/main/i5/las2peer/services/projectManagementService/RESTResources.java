@@ -1459,7 +1459,77 @@ public class RESTResources {
 		}
         
 	}
+	
+	/**
+	 * Requests GitHub access token for the currently active user. Therefore it uses the given
+	 * gitHubCode. Both the access token and the GitHub username of the user are stored into the 
+	 * database and returned in the requests result.
+	 * @param gitHubCode Code given from GitHub API to request access token.
+	 * @return Response containing user's access token and GitHub username (or error code and error message).
+	 */
+	@POST
+	@Path("/users/githubcode/{gitHubCode}")
+	@ApiOperation(value = "Requests GitHub access token and username for the currently active user by using the given code.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, returning GitHub access token and username."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User is not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+    public Response postGitHubCode(@PathParam("gitHubCode") String gitHubCode) {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "postGitHubCode called");
 		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			try {
+				String response = GitHubHelper.getInstance().getUserAccessToken(gitHubCode);
+				
+				JSONObject json = (JSONObject) JSONValue.parse(response);
+				if(json.containsKey("access_token")) {
+					String accessToken = (String) json.get("access_token");
+					
+				    Connection connection = null;
+				    try {
+				    	connection = dbm.getConnection();
+				    	
+						// get user
+					    User user = authManager.getUser();
+				        user.putGitHubAccessToken(accessToken, connection);
+				        
+				        String jsonUserStr = GitHubHelper.getInstance().getGitHubUsername(accessToken);
+				        
+				        JSONObject jsonUser = (JSONObject) JSONValue.parse(jsonUserStr);
+				        if(!jsonUser.containsKey("login")) {
+				        	return Response.serverError().build();
+				        }
+				        
+				        String username = (String) jsonUser.get("login");
+				        user.putUsername(username, connection);
+				        
+				        JSONObject jsonResponse = (JSONObject) JSONValue.parse(response);
+				        jsonResponse.put("gitHubUsername", username);
+				        
+				        return Response.ok(jsonResponse.toJSONString()).build();
+				    } catch (SQLException e) {
+				    	logger.printStackTrace(e);
+			        	return Response.serverError().entity("Internal server error.").build();
+				    } finally {
+						try {
+							if(connection != null) connection.close();
+						} catch (SQLException e) {
+							logger.printStackTrace(e);
+							return Response.serverError().entity("Internal server error.").build();
+						}
+					}
+				} else {
+					return Response.serverError().build();
+				}
+			} catch (GitHubException e) {
+				logger.printStackTrace(e);
+				return Response.serverError().entity(e.getMessage()).build();
+			}
+		}
+	}
 	
 	
 	/**
@@ -1535,65 +1605,5 @@ public class RESTResources {
 			}
 		}
 		
-	}
-	
-	/**
-	 * Method to update the GitHub username of a CAE user.
-	 * @param inputUsername GitHub username that should be stored in the database.
-	 * @return Response with status code (and possibly error message).
-	 */
-	@PUT
-	@Path("/users")
-	@Consumes(MediaType.APPLICATION_JSON)
-	@ApiOperation(value = "Can be used to update the GitHub username of a user.")
-	@ApiResponses(value = {
-			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, updated GitHub username."),
-			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "Unauthorized."),
-			@ApiResponse(code = HttpURLConnection.HTTP_BAD_REQUEST, message = "Possibly an attribute is missing."),
-			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
-	})
-	public Response putGitHubUsername(String inputUsername) {
-		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "putGitHubUsername: trying to edit users GitHub username");
-		
-		if(authManager.isAnonymous()) {
-			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
-		} else {
-			Connection connection = null;
-		    try {
-			    connection = dbm.getConnection();
-			    
-			    // get user
-			    User user = authManager.getUser();
-			    
-			    // extract username from given json
-			    JSONObject json = (JSONObject) JSONValue.parse(inputUsername);
-			    if(json.containsKey("gitHubUsername")) {
-			    	String gitHubUsername = (String) json.get("gitHubUsername");
-			    	
-			    	// update username
-				    user.putUsername(gitHubUsername, connection);
-				    
-				    // response ok
-				    return Response.ok().build();
-			    } else {
-			        // attribute missing
-			    	return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
-			    			.entity("Attribute 'gitHubUsername' is missing.").build();
-			    }
-		    } catch (SQLException e) {
-            	logger.printStackTrace(e);
-            	return Response.serverError().entity("Internal server error.").build();
-            } catch (GitHubException e) {
-            	logger.printStackTrace(e);
-            	return Response.serverError().entity("Internal server error occurred during using the GitHub API.").build();
-			} finally {
-				try {
-					if(connection != null) connection.close();
-				} catch (SQLException e) {
-					logger.printStackTrace(e);
-					return Response.serverError().entity("Internal server error.").build();
-				}
-			}
-		}
 	}
 }

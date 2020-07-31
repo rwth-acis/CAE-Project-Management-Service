@@ -57,6 +57,14 @@ public class GitHubHelper {
 	public void setGitHubOrganization(String gitHubOrganization) {
 		this.gitHubOrganization = gitHubOrganization;
 	}
+	
+	public void setOAuthClientId(String oAuthClientId) {
+		this.oAuthClientId = oAuthClientId;
+	}
+	
+	public void setOAuthClientSecret(String oAuthClientSecret) {
+		this.oAuthClientSecret = oAuthClientSecret;
+	}
 
 	/**
 	 * GitHub configuration.
@@ -65,6 +73,9 @@ public class GitHubHelper {
 	private String gitHubUser = null;
 	private String gitHubPassword = null;
 	private String gitHubOrganization = null;
+	
+	private String oAuthClientId = null;
+	private String oAuthClientSecret = null;
 	
 	/**
 	 * Creates a public GitHub project with the given name.
@@ -230,6 +241,82 @@ public class GitHubHelper {
 	}
 	
 	/**
+	 * Requests the user's GitHub access token by using the given code.
+	 * @param code
+	 * @return GitHub access token.
+	 * @throws GitHubException If something with the request to GitHub API went wrong.
+	 */
+	public String getUserAccessToken(String code) throws GitHubException {
+		URL url;
+		try {
+			url = new URL("https://github.com/login/oauth/access_token");
+			
+			String body = this.getOAuthBody(code);
+			
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("POST");
+			connection.setDoInput(true);
+			connection.setDoOutput(true);
+			connection.setUseCaches(false);
+			connection.setRequestProperty("Accept", "application/json"); // otherwise we dont get json result
+			connection.setRequestProperty("Content-Type", "application/json");
+			connection.setRequestProperty("Content-Length", String.valueOf(body.length()));
+			
+			writeRequestBody(connection, body);
+			
+			// forward (in case of) error
+			if (connection.getResponseCode() != 200) {
+				String message = getErrorMessage(connection);
+				throw new GitHubException(message);
+			} else {
+				// get response
+				String response = getResponseBody(connection);
+			    return response;
+			}
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		}
+	}
+	
+	/**
+	 * Requests the username of the GitHub account by using the given access token.
+	 * @param accessToken GitHub access token.
+	 * @return Username of GitHub account.
+	 * @throws GitHubException If something with the request to GitHub API went wrong.
+	 */
+	public String getGitHubUsername(String accessToken) throws GitHubException {
+		URL url;
+		try {
+			url = new URL(API_BASE_URL + "/user");
+			
+			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+			connection.setRequestMethod("GET");
+			connection.setDoInput(true);
+			connection.setRequestProperty("Authorization", "token " + accessToken);
+			
+			// forward (in case of) error
+			if (connection.getResponseCode() != 200) {
+				String message = getErrorMessage(connection);
+				throw new GitHubException(message);
+			} else {
+				// get response
+				String response = getResponseBody(connection);
+			    return response;
+			}
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new GitHubException(e.getMessage());
+		}
+	}
+	
+	/**
 	 * Creates a GitHub project in the GitHub organization given by the properties file.
 	 * @param projectName Name of the GitHub project.
 	 * @return The newly created GitHubProject object.
@@ -360,6 +447,14 @@ public class GitHubHelper {
 			e.printStackTrace();
 			throw new GitHubException(e.getMessage());
 		}
+	}
+	
+	private String getOAuthBody(String code) {
+		JSONObject jsonObject = new JSONObject();
+		jsonObject.put("client_id", this.oAuthClientId);
+		jsonObject.put("client_secret", this.oAuthClientSecret);
+		jsonObject.put("code", code);
+		return jsonObject.toJSONString();
 	}
 	
 	/**
