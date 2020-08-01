@@ -728,6 +728,41 @@ public class Project {
 	}
 	
 	/**
+	 * Updates the role of the given user.
+	 * @param userId Id of the user whose role should be updated.
+	 * @param roleId Id of the role that the user should be assigned to.
+	 * @param connection Connection object
+	 * @return Whether the role could be edited.
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public boolean editUserRole(int userId, int roleId, Connection connection) throws SQLException {
+		// check if user is member of project
+		if(!this.hasUser(userId, connection)) return false;
+		// check if role exists
+		if(!this.hasRole(roleId)) return false;
+		
+		// both user and role exist
+		// first we need to get the id of the ProjectToUser entry
+		PreparedStatement statement = connection
+				.prepareStatement("SELECT * FROM ProjectToUser WHERE projectId = ? AND userId = ?;");
+		statement.setInt(1, this.id);
+		statement.setInt(2, userId);
+		ResultSet result = statement.executeQuery();
+		if(!result.next()) return false;
+		int projectToUserId = result.getInt("id");
+		result.close();
+		statement.close();
+		
+		statement = connection
+				.prepareStatement("UPDATE UserToRole SET roleId = ? WHERE projectToUserId = ?;");
+		statement.setInt(1, roleId);
+		statement.setInt(2, projectToUserId);
+		statement.executeUpdate();
+		statement.close();
+		return true;
+	}
+	
+	/**
 	 * Queries the database by using the given statement (which needs to fulfill some requirements, see below).
 	 * @param statement IMPORTANT: this must already have all parameters set and the query needs to select the project id.
 	 * @param connection Connection object

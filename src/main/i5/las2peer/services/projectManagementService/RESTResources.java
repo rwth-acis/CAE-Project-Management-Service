@@ -496,6 +496,72 @@ public class RESTResources {
 	}
 	
 	/**
+	 * Edits the role of a user in a project.
+	 * @param projectId Id of the project where the role of the user should be edited.
+	 * @param userId Id of the user whose role should be edited.
+	 * @param roleId Id of the new role.
+	 * @return Response with status and probably error message.
+	 */
+	@PUT
+	@Path("/projects/{projectId}/users/{userId}/role/{roleId}")
+	@ApiOperation(value = "Edits the role of a user in a project.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, edited user's role in project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to edit user roles."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or user whose role should be edited could not be found or user to edit is no member of the project."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+    public Response putUserRole(@PathParam("projectId") int projectId, @PathParam("userId") int userId, @PathParam("roleId") int roleId) {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "putUserRole called");
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			// check if user is allowed to edit role of user in this project
+			Connection connection = null;
+			try {
+			    connection = dbm.getConnection();
+			    
+			    User user = authManager.getUser();
+			    
+			    // get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is part of the project and thus is allowed to edit users role
+	    	    	
+		    	    boolean edited = project.editUserRole(userId, roleId, connection);
+		    	    if(edited) {
+		    	    	return Response.ok().build();
+		    	    } else {
+		    	    	return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)
+		    	    			.entity("User is no project member or role does not exist.").build();
+		    	    }
+			    } else {
+			    	// user does not have the permission to edit users role in the project
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to edit role of a user.").build();
+			    }
+			    
+			} catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	/**
 	 * Adds a role to a project.
 	 * Therefore, the user sending the request needs to be authorized in order
 	 * to check if the user is a member of the project, because only project members 
