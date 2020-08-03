@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS commedit.User (
   loginName VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
   gitHubUsername VARCHAR(255),
+  gitHubAccessToken VARCHAR(255),
   CONSTRAINT userPK PRIMARY KEY (id)
 );
 
