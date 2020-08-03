@@ -194,8 +194,9 @@ public class Project {
 		while(queryResult.next()) {
 			int roleId = queryResult.getInt("id");
 			String name = queryResult.getString("name");
+			String widgetConfig = queryResult.getString("widgetConfig");
 			boolean isDefault = queryResult.getBoolean("is_default");
-			this.roles.add(new Role(roleId, this.id, name, isDefault));
+			this.roles.add(new Role(roleId, this.id, name, widgetConfig, isDefault));
 		}
 		
 		statement.close();
@@ -619,6 +620,25 @@ public class Project {
 		statement.close();
 		
 		return true;
+	}
+	
+	/**
+	 * Updates the widget config of a role.
+	 * @param roleId Id of the role where the widget config should be updated.
+	 * @param widgetConfig The new widget config.
+	 * @param connection Connection object
+	 * @throws SQLException If something with the database went wrong.
+	 */
+	public void updateRoleWidgetConfig(int roleId, String widgetConfig, Connection connection) throws SQLException {
+		// first check if role is part of the project
+		if(!hasRole(roleId)) throw new RoleNotFoundException();
+		
+		// update role in database
+		PreparedStatement statement = connection.prepareStatement("UPDATE Role SET widgetConfig = ? WHERE id = ?;");
+		statement.setString(1, widgetConfig);
+		statement.setInt(2, roleId);
+		statement.executeUpdate();
+		statement.close();
 	}
 	
 	/**

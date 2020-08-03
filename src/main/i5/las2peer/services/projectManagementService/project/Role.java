@@ -32,35 +32,51 @@ public class Role {
 	private String name;
 	
 	/**
+	 * Contains information on which widgets are enabled for this role.
+	 */
+	private String widgetConfig;
+	
+	/**
 	 * Whether the role is the default one of the project.
 	 */
 	private boolean isDefault;
 	
-	public Role(int id, int projectId, String name, boolean isDefault) {
+	public Role(int id, int projectId, String name, String widgetConfig, boolean isDefault) {
 		this.id = id;
 		this.projectId = projectId;
 	    this.name = name;	
+	    this.widgetConfig = widgetConfig;
+	    this.isDefault = isDefault;
+	}
+	
+	public Role(int projectId, String name, String widgetConfig, boolean isDefault) {
+	    this.projectId = projectId;
+	    this.name = name;	
+	    this.widgetConfig = widgetConfig;
 	    this.isDefault = isDefault;
 	}
 	
 	public Role(int projectId, String name, boolean isDefault) {
 	    this.projectId = projectId;
 	    this.name = name;	
+	    this.widgetConfig = PredefinedRoles.VIEW_ALL;
 	    this.isDefault = isDefault;
 	}
 	
 	/**
 	 * Method for storing the role object to the database.
-	 * Project id, name and isDefault need to be set before calling this method.
+	 * Project id, name, widgetConfig and isDefault need to be set before calling this method.
 	 * @param connection a Connection object
 	 * @throws SQLException If something with database went wrong.
 	 */
 	public void persist(Connection connection) throws SQLException {
-		PreparedStatement statement = connection.prepareStatement("INSERT INTO Role (projectId, name, is_default) VALUES (?,?,?);", Statement.RETURN_GENERATED_KEYS);
+		PreparedStatement statement = connection
+				.prepareStatement("INSERT INTO Role (projectId, name, widgetConfig, is_default) VALUES (?,?,?,?);", Statement.RETURN_GENERATED_KEYS);
 		// set projectId and name
 		statement.setInt(1, this.projectId);
 		statement.setString(2, this.name);
-		statement.setBoolean(3, this.isDefault);
+		statement.setString(3, this.widgetConfig);
+		statement.setBoolean(4, this.isDefault);
 		
 		// execute query
 		statement.executeUpdate();
@@ -83,6 +99,7 @@ public class Role {
 		
 		jsonRole.put("id", this.id);
 		jsonRole.put("name", this.name);
+		jsonRole.put("widgetConfig", this.widgetConfig);
 		
 		return jsonRole;
 	}
@@ -97,6 +114,10 @@ public class Role {
 	
 	public String getName() {
 		return this.name;
+	}
+	
+	public String getWidgetConfig() {
+		return this.widgetConfig;
 	}
 	
 	public boolean isDefault() {

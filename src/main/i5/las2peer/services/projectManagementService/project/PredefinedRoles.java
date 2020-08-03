@@ -9,6 +9,11 @@ import java.util.ArrayList;
  *
  */
 public class PredefinedRoles {
+	
+	/**
+	 * Widget config which allows to view every widget.
+	 */
+	public static final String VIEW_ALL = "{\"Frontend Modeling\":{\"widgets\":{\"Wireframe\":{\"enabled\":true},\"Modeling\":{\"enabled\":true},\"Code Editor\":{\"enabled\":true},\"Versioning\":{\"enabled\":true},\"Live Preview\":{\"enabled\":true}}},\"Microservice Modeling\":{\"widgets\":{\"Modeling\":{\"enabled\":true},\"Swagger Editor\":{\"enabled\":true},\"Code Editor\":{\"enabled\":true},\"Versioning\":{\"enabled\":true}}},\"Application Mashup\":{\"widgets\":{\"Modeling incl. Select\":{\"enabled\":true},\"Deployment\":{\"enabled\":true},\"Versioning\":{\"enabled\":true},\"Matching\":{\"enabled\":true}}}}";
 
 	/**
 	 * Gets the list of predefined roles every project gets when creating it.
@@ -18,10 +23,10 @@ public class PredefinedRoles {
 	public static ArrayList<Role> get(int projectId) {
 		ArrayList<Role> predefinedRoles = new ArrayList<>();
 		
-		Role frontendModeler = new Role(projectId, "Frontend Modeler", true); // default role
-		Role applicationModeler = new Role(projectId, "Application Modeler", false);
-		Role backendModeler = new Role(projectId, "Backend Modeler", false);
-		Role softwareEngineer = new Role(projectId, "Software Engineer", false);
+		Role frontendModeler = new Role(projectId, "Frontend Modeler", VIEW_ALL, true); // default role
+		Role applicationModeler = new Role(projectId, "Application Modeler", VIEW_ALL, false);
+		Role backendModeler = new Role(projectId, "Backend Modeler", VIEW_ALL, false);
+		Role softwareEngineer = new Role(projectId, "Software Engineer", VIEW_ALL, false);
 		
 		predefinedRoles.add(frontendModeler);
 		predefinedRoles.add(applicationModeler);

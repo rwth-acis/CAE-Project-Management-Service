@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS commedit.Role (
   id INT NOT NULL AUTO_INCREMENT,
   projectId INT NOT NULL,
   name VARCHAR(255) NOT NULL,
+  widgetConfig TEXT NOT NULL,
   is_default BOOLEAN NOT NULL,
   CONSTRAINT rolePK PRIMARY KEY (id),
   CONSTRAINT roleProjectFK FOREIGN KEY (projectId) REFERENCES commedit.Project(id) ON DELETE CASCADE

@@ -721,6 +721,72 @@ public class RESTResources {
 	}
 	
 	/**
+	 * Updates the widget config of the given role.
+	 * @param projectId Id of the project which the role belongs to.
+	 * @param roleId Id of the role which should be updated.
+	 * @param widgetConfig New widget config that should be stored.
+	 * @return Response with status (and possibly an error message).
+	 */
+	@PUT
+	@Path("/projects/{projectId}/roles/{roleId}")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@ApiOperation(value = "Updates the widget config of the given role.")
+	@ApiResponses(value = {
+			@ApiResponse(code = HttpURLConnection.HTTP_OK, message = "OK, update role."),
+			@ApiResponse(code = HttpURLConnection.HTTP_UNAUTHORIZED, message = "User not authorized."),
+			@ApiResponse(code = HttpURLConnection.HTTP_FORBIDDEN, message = "User is not member of the project and thus not allowed to update roles."),
+			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or role to update could not be found."),
+			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
+	})
+	public Response updateRole(@PathParam("projectId") int projectId, @PathParam("roleId") int roleId, String widgetConfig) {
+        Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "updateRole: called with projectId " + projectId + " and roleId " + roleId);
+		
+		if(authManager.isAnonymous()) {
+			return Response.status(HttpURLConnection.HTTP_UNAUTHORIZED).build();
+		} else {
+			Connection connection = null;
+		    try {
+			    connection = dbm.getConnection();
+			    
+			    // get user
+			    User user = authManager.getUser();
+			    
+			    // get project by id (load it from database)
+			    Project project = new Project(projectId, connection);
+			    
+			    if(project.hasUser(user.getId(), connection)) {
+			    	// user is part of the project and thus is allowed to update roles
+			    	
+			    	project.updateRoleWidgetConfig(roleId, widgetConfig, connection);
+			    	return Response.ok().build();
+			    } else {
+			    	// user does not have the permission to update roles from the project
+			    	return Response.status(HttpURLConnection.HTTP_FORBIDDEN)
+			    			.entity("User needs to be member of the project to update a role from it.").build();
+			    }
+		    } catch (RoleNotFoundException e) {
+				// role was not included in the project
+    	    	return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+    	    			.entity("Project contains no role with the given id.").build();
+			}catch (ProjectNotFoundException e) {
+				return Response.status(HttpURLConnection.HTTP_NOT_FOUND)
+						.entity("Project with the given id could not be found.").build();
+			} catch (SQLException e) {
+            	logger.printStackTrace(e);
+            	return Response.serverError().entity("Internal server error.").build();
+            } finally {
+				try {
+					if(connection != null) connection.close();
+				} catch (SQLException e) {
+					logger.printStackTrace(e);
+					return Response.serverError().entity("Internal server error.").build();
+				}
+			}
+		}
+	}
+	
+	
+	/**
 	 * Adds a component to a project.
 	 * @param projectId Id of the project where a component should be added to.
 	 * @param inputComponent JSON representation of the component to add to the project (must contain access token of user).
