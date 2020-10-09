@@ -1,8 +1,7 @@
 # CAE-Project-Management-Service
-This [las2peer](https://github.com/rwth-acis/las2peer) service is used by the Community Application Editor's frontend for project management.
-This includes creating project and managing their users and components.
+This [las2peer](https://github.com/rwth-acis/las2peer) service is used by the [Community Application Editor's](https://github.com/rwth-acis/CAE) frontend for project management.
+This includes creating projects and managing their components, users and roles.
 
-Please note: The project management service is currently in a very early development phase and not everything will work fine!
 
 ## How to build this service
 Building the service is just building a las2peer service. The [las2peer template project](https://github.com/rwth-acis/las2peer-Template-Project) and its wiki contain detailed information, but basically you should be able to clone the repository and execute a build using ant.
