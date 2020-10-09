@@ -52,8 +52,7 @@ The las2peer port is fixed at *9011*.
 | MYSQL_PASSWORD | *mandatory* |
 | MYSQL_HOST | mysql |
 | MYSQL_PORT | 3306 |
-| GITHUB_USER | *mandatory* |
-| GITHUB_PASSWORD | *mandatory* |
+| GITHUB_PERSONAL_ACCESS_TOKEN | *mandatory* |
 | GITHUB_ORGANIZATION | *mandatory* |
 | GITHUB_OAUTH_CLIENTID | *mandatory* |
 | GITHUB_OAUTH_CLIENTSECRET | *mandatory* |
