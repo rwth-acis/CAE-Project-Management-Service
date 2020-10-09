@@ -46,12 +46,8 @@ public class GitHubHelper {
 		return GitHubHelper.instance;
 	}
 	
-	public void setGitHubUser(String gitHubUser) {
-		this.gitHubUser = gitHubUser;
-	}
-	
-	public void setGitHubPassword(String gitHubPassword) {
-		this.gitHubPassword = gitHubPassword;
+	public void setGitHubPersonalAccessToken(String gitHubPersonalAccessToken) {
+		this.gitHubPersonalAccessToken = gitHubPersonalAccessToken;
 	}
 	
 	public void setGitHubOrganization(String gitHubOrganization) {
@@ -70,8 +66,7 @@ public class GitHubHelper {
 	 * GitHub configuration.
 	 * This can be updated in the properties file of the service.
 	 */
-	private String gitHubUser = null;
-	private String gitHubPassword = null;
+	private String gitHubPersonalAccessToken = null;
 	private String gitHubOrganization = null;
 	
 	private String oAuthClientId = null;
@@ -84,8 +79,8 @@ public class GitHubHelper {
 	 * @throws GitHubException If something with the requests to the GitHub API went wrong.
 	 */
 	public GitHubProject createPublicGitHubProject(String projectName) throws GitHubException {
-		if(gitHubUser == null || gitHubPassword == null || gitHubOrganization == null) {
-			throw new GitHubException("One of the variables user, password or organization are not set.");
+		if(gitHubPersonalAccessToken == null || gitHubOrganization == null) {
+			throw new GitHubException("One of the variables personal access token or organization are not set.");
 		}
 		
 		GitHubProject gitHubProject = createGitHubProject(projectName);
@@ -495,10 +490,10 @@ public class GitHubHelper {
 	
 	/**
 	 * Getter for encoded auth string.
-	 * @return Encoded auth string containing GitHub user and password.
+	 * @return Encoded auth string containing GitHub personal access token.
 	 */
 	private String getAuthStringEnc() {
-		String authString = this.gitHubUser + ":" + this.gitHubPassword;
+		String authString = this.gitHubPersonalAccessToken;
 
 		byte[] authEncBytes = Base64.getEncoder().encode(authString.getBytes());
 		return new String(authEncBytes);

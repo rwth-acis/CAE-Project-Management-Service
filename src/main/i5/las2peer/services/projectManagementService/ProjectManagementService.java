@@ -40,8 +40,7 @@ public class ProjectManagementService extends RESTService {
 	/*
 	 * GitHub user login data.
 	 */
-	private String gitHubUser;
-	private String gitHubPassword;
+	private String gitHubPersonalAccessToken;
 	private String gitHubOrganization;
 	
 	/*
@@ -67,8 +66,7 @@ public class ProjectManagementService extends RESTService {
 		
 		// setup GitHubHelper
 		GitHubHelper gitHubHelper = GitHubHelper.getInstance();
-		gitHubHelper.setGitHubUser(this.gitHubUser);
-		gitHubHelper.setGitHubPassword(this.gitHubPassword);
+		gitHubHelper.setGitHubPersonalAccessToken(this.gitHubPersonalAccessToken);
 		gitHubHelper.setGitHubOrganization(this.gitHubOrganization);
 		gitHubHelper.setOAuthClientId(this.gitHubOAuthClientId);
 		gitHubHelper.setOAuthClientSecret(this.gitHubOAuthClientSecret);

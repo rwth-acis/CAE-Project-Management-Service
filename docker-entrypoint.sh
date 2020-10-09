@@ -22,10 +22,8 @@ export MYSQL_DATABASE='commedit'
     echo "Mandatory variable MYSQL_USER is not set. Add -e MYSQL_USER=myuser to your arguments." && exit 1
 [[ -z "${MYSQL_PASSWORD}" ]] && \
     echo "Mandatory variable MYSQL_PASSWORD is not set. Add -e MYSQL_PASSWORD=mypasswd to your arguments." && exit 1
-[[ -z "${GITHUB_USER}" ]] && \
-    echo "Mandatory variable GITHUB_USER is not set. Add -e GITHUB_USER=username to your arguments." && exit 1
-[[ -z "${GITHUB_PASSWORD}" ]] && \
-    echo "Mandatory variable GITHUB_PASSWORD is not set. Add -e GITHUB_PASSWORD=password to your arguments." && exit 1
+[[ -z "${GITHUB_PERSONAL_ACCESS_TOKEN}" ]] && \
+    echo "Mandatory variable GITHUB_PERSONAL_ACCESS_TOKEN is not set. Add -e GITHUB_PERSONAL_ACCESS_TOKEN=personal_access_token to your arguments." && exit 1
 [[ -z "${GITHUB_ORGANIZATION}" ]] && \
     echo "Mandatory variable GITHUB_ORGANIZATION is not set. Add -e GITHUB_ORGANIZATION=organization_name to your arguments." && exit 1
 [[ -z "${GITHUB_OAUTH_CLIENTID}" ]] && \
@@ -58,8 +56,7 @@ set_in_service_config jdbcUrl "jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/"
 set_in_service_config jdbcSchema ${MYSQL_DATABASE}
 set_in_service_config jdbcLogin ${MYSQL_USER}
 set_in_service_config jdbcPass ${MYSQL_PASSWORD}
-set_in_service_config gitHubUser ${GITHUB_USER}
-set_in_service_config gitHubPassword ${GITHUB_PASSWORD}
+set_in_service_config gitHubPersonalAccessToken ${GITHUB_PERSONAL_ACCESS_TOKEN}
 set_in_service_config gitHubOrganization ${GITHUB_ORGANIZATION}
 set_in_service_config debugDisableCategoryCreation ${DISABLE_CATEGORY_CREATION}
 set_in_service_config gitHubOAuthClientId ${GITHUB_OAUTH_CLIENTID}

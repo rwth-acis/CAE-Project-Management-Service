@@ -16,15 +16,16 @@ docker build . -t cae-project-management-service
 Then you can run the image like this:
 
 ```bash
-docker run -e MYSQL_USER=myuser -e MYSQL_PASSWORD=mypasswd -e GITHUB_USER=github_username -e GITHUB_PASSWORD=github_password -e GITHUB_ORGANIZATION=organization_name -e GITHUB_OAUTH_CLIENTID=client_id -e GITHUB_OAUTH_CLIENTSECRET=client_secret -p 8080:8080 -p 9011:9011 cae-project-management-service
+docker run -e MYSQL_USER=myuser -e MYSQL_PASSWORD=mypasswd -e GITHUB_PERSONAL_ACCESS_TOKEN=personal_access_token -e GITHUB_ORGANIZATION=organization_name -e GITHUB_OAUTH_CLIENTID=client_id -e GITHUB_OAUTH_CLIENTSECRET=client_secret -p 8080:8080 -p 9011:9011 cae-project-management-service
 ```
 
 Replace *myuser* and *mypasswd* with the username and password of a MySQL user with access to a database named *commedit*.
 By default the database host is *mysql* and the port is *3306*.
 You can use --link option to connect the project management service with the MySQL docker container.
 Note, when using MYSQL_HOST env variable, it seems to be needed to also give the MYSQL_PORT even if it should be the standard one.
-By using the environment variables GITHUB_USER, GITHUB_PASSWORD and GITHUB_ORGANIZATION you can select which GitHub organization gets used for storing the GitHub projects that correspond to CAE projects.
-Note, that the user must be able to create projects inside the given organization.
+By using the environment variables GITHUB_PERSONAL_ACCESS_TOKEN and GITHUB_ORGANIZATION you can select which GitHub organization gets used for storing the GitHub projects that correspond to CAE projects.
+Note, that the user (that the personal access token from GitHub belongs to) must be able to create projects inside the given organization.
+You can generate a new personal access token in GitHub under "Settings" -> "Developer settings" -> "Personal access tokens".
 
 For connecting the users CAE account with the GitHub account, an OAuth GitHub app is required. You can read more on how to create a GitHub OAuth app [here](https://docs.github.com/en/developers/apps/creating-an-oauth-app).
 Once you've created your OAuth app, you will receive a client id and a client secret. Replace the placeholders *client_id* and *client_secret* in the docker run command with these.
