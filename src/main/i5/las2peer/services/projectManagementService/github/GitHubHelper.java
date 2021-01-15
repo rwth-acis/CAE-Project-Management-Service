@@ -4,16 +4,15 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Base64;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.net.http.*;
+import java.net.http.HttpRequest.BodyPublishers;
+import java.net.http.HttpResponse.BodyHandlers;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -35,9 +34,7 @@ public class GitHubHelper {
 	private static final String API_BASE_URL = "https://api.github.com";
 	
 	// make sure that constructor cannot be accessed from outside
-	private GitHubHelper() {
-		allowPatchMethod();
-	}
+	private GitHubHelper() {}
 	
 	public static GitHubHelper getInstance() {
 		if(GitHubHelper.instance == null) {
@@ -373,32 +370,26 @@ public class GitHubHelper {
 	private void makeGitHubProjectPublic(int gitHubProjectId) throws GitHubException {
 		String body = getVisibilityPublicBody();
 		String authStringEnc = getAuthStringEnc();
-
-		URL url;
+		
+		String url = API_BASE_URL + "/projects/" + gitHubProjectId;
+		
+		HttpClient client = HttpClient.newHttpClient();
+		HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .method("PATCH", BodyPublishers.ofString(body))
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/vnd.github.inertia-preview+json")
+                .header("Authorization", "Basic " + authStringEnc)
+                .build();
+		
+		HttpResponse<String> response;
 		try {
-			url = new URL(API_BASE_URL + "/projects/" + gitHubProjectId);
-
-			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-			connection.setRequestMethod("PATCH");
-			connection.setDoInput(true);
-			connection.setDoOutput(true);
-			connection.setUseCaches(false);
-			connection.setRequestProperty("Accept", "application/vnd.github.inertia-preview+json");
-			connection.setRequestProperty("Content-Type", "application/json");
-			connection.setRequestProperty("Content-Length", String.valueOf(body.length()));
-			connection.setRequestProperty("Authorization", "Basic " + authStringEnc);
-
-			writeRequestBody(connection, body);
-			
-			// forward (in case of) error
-		    if (connection.getResponseCode() != 200) {
-			    String message = getErrorMessage(connection);
+			response = client.send(request, BodyHandlers.ofString());
+			if(response.statusCode() != 200) {
+				String message = response.body();
 				throw new GitHubException(message);
-		    }
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
-			throw new GitHubException(e.getMessage());
-		} catch (IOException e) {
+			}
+		} catch (IOException | InterruptedException e) {
 			e.printStackTrace();
 			throw new GitHubException(e.getMessage());
 		}
@@ -543,36 +534,5 @@ public class GitHubHelper {
 		writer.flush();
 		writer.close();
 	}
-	
-	/**
-	 * This is a workaround for the following problem:
-	 * In order to make the GitHub project public, it is necessary to 
-	 * send a PATCH request. This is normally not working when using 
-	 * HttpURLConnection. Since we dont want to use an external library for 
-	 * it, we make use of this workaround found on Stackoverflow:
-	 * https://stackoverflow.com/questions/25163131/httpurlconnection-invalid-http-method-patch/46323891#46323891
-	 * Then also PATCH requests are working.
-	 * @param methods
-	 */
-	private static void allowPatchMethod() {
-        try {
-            Field methodsField = HttpURLConnection.class.getDeclaredField("methods");
-
-            Field modifiersField = Field.class.getDeclaredField("modifiers");
-            modifiersField.setAccessible(true);
-            modifiersField.setInt(methodsField, methodsField.getModifiers() & ~Modifier.FINAL);
-
-            methodsField.setAccessible(true);
-
-            String[] oldMethods = (String[]) methodsField.get(null);
-            Set<String> methodsSet = new LinkedHashSet<>(Arrays.asList(oldMethods));
-            methodsSet.add("PATCH");
-            String[] newMethods = methodsSet.toArray(new String[0]);
-
-            methodsField.set(null, newMethods);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new IllegalStateException(e);
-        }
-    }
 	
 }
