@@ -9,5 +9,6 @@
 	<classpathentry kind="lib" path="servicebundle/json-simple-1.1.jar"/>
 	<classpathentry kind="lib" path="servicebundle/commons-dbcp2-2.0.jar"/>
 	<classpathentry kind="lib" path="servicebundle/mysql-connector-java-5.1.6.jar"/>
+	<classpathentry kind="src" path="lib"/>
 	<classpathentry kind="output" path="output"/>
 </classpath>
