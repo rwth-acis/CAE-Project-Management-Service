@@ -1,9 +1,11 @@
 /output/
-/export/
+/project_management_service/output/
+/project_management_service/export/
 /node-storage/
 /.las2peer/
 /tmp/
 /log/
+/project_management_service/log/
 /lib/
 /etc/ivy/ivy.jar
 /service/
@@ -18,3 +20,11 @@
 /etc/startup/
 *.secret
 archiva_credentials.xml
+.project
+.classpath
+
+# Ignore Gradle project-specific cache directory
+.gradle
+
+# Ignore Gradle build output directory
+build

@@ -1,0 +1,2 @@
+rootProject.name = 'CAE-Project-Management-Service'
+include('project_management_service')
