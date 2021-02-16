@@ -1684,7 +1684,7 @@ public class RESTResources {
 				user = authManager.getUser();
 				
 				// returns user as json string
-	            return Response.ok(user.toJSONObject().toJSONString()).build();
+	            return Response.ok(user.toJSONObject(true).toJSONString()).build();
 			} catch (SQLException e) {
 				logger.printStackTrace(e);
 				// return server error at the end
