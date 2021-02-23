@@ -524,7 +524,7 @@ public class Project {
 		// the project too) the role needs to be added manually
 		JSONArray jsonUsers = new JSONArray();
 		for(User user : users) {
-			JSONObject jsonUser = user.toJSONObject();
+			JSONObject jsonUser = user.toJSONObject(false);
 			
 			// find out id of the role which is assigned to the user
 			int roleId = roleAssignment.get(user).getId();

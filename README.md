@@ -4,7 +4,7 @@ This includes creating projects and managing their components, users and roles.
 
 
 ## How to build this service
-Building the service is just building a las2peer service. The [las2peer template project](https://github.com/rwth-acis/las2peer-Template-Project) and its wiki contain detailed information, but basically you should be able to clone the repository and execute a build using ant.
+Building the service is just building a las2peer service. The [las2peer template project](https://github.com/rwth-acis/las2peer-Template-Project) and its wiki contain detailed information, but basically you should be able to clone the repository and execute a build using gradle.
 
 ## How to run using Docker
 
