@@ -151,6 +151,25 @@ if ! mysql -h${MYSQL_HOST} -P${MYSQL_PORT} -u${MYSQL_USER} -p${MYSQL_PASSWORD} -
     mysql -h${MYSQL_HOST} -P${MYSQL_PORT} -u${MYSQL_USER} -p${MYSQL_PASSWORD} ${MYSQL_DATABASE} < ${CREATE_DB_SQL}
 fi
 
+# wait for any bootstrap host to be available
+if [[ ! -z "${BOOTSTRAP}" ]]; then
+    echo "Waiting for any bootstrap host to become available..."
+    for host_port in ${BOOTSTRAP//,/ }; do
+        arr_host_port=(${host_port//:/ })
+        host=${arr_host_port[0]}
+        port=${arr_host_port[1]}
+        if { </dev/tcp/${host}/${port}; } 2>/dev/null; then
+            echo "${host_port} is available. Continuing..."
+            break
+        fi
+    done
+fi
+
+# prevent glob expansion in lib/*
+set -f
+LAUNCH_COMMAND='java -cp lib/* i5.las2peer.tools.L2pNodeLauncher -s service -p '"${LAS2PEER_PORT} ${SERVICE_EXTRA_ARGS}"
+if [[ ! -z "${BOOTSTRAP}" ]]; then
+    LAUNCH_COMMAND="${LAUNCH_COMMAND} -b ${BOOTSTRAP}"
 
 if [ -n "$LAS2PEER_BOOTSTRAP" ]; then
     if waitForEndpoint $(host ${LAS2PEER_BOOTSTRAP}) $(port ${LAS2PEER_BOOTSTRAP}) 600; then
@@ -182,31 +201,32 @@ echo external_address = $(curl -s https://ipinfo.io/ip):${LAS2PEER_PORT} > etc/p
 # start the service within a las2peer node
 if [[ -z "${@}" ]]
 then
-    if [ -n "$LAS2PEER_ETH_HOST" ]; then
-    echo ... using ethereum boot procedure: 
-    java $(echo $ADDITIONAL_JAVA_ARGS) \
-        -cp "lib/*" i5.las2peer.tools.L2pNodeLauncher \
-        --service-directory service \
-        --port $LAS2PEER_PORT \
-        $([ -n "$LAS2PEER_BOOTSTRAP" ] && echo "--bootstrap $LAS2PEER_BOOTSTRAP") \
-        --node-id-seed $NODE_ID_SEED \
-        --ethereum-mnemonic "$(selectMnemonic)" \
-        $(echo $ADDITIONAL_LAUNCHER_ARGS) \
-        uploadStartupDirectory \
-		startService\("'""${SERVICE}""'", "'""${SERVICE_PASSPHRASE}""'"\) \
-		startWebConnector \
-        "node=getNodeAsEthereumNode()" "registry=node.getRegistryClient()" "n=getNodeAsEthereumNode()" "r=n.getRegistryClient()"
-    else
-     echo ... using non-ethereum boot procedure:
-    java $(echo $ADDITIONAL_JAVA_ARGS) \
-        -cp "lib/*" i5.las2peer.tools.L2pNodeLauncher \
-        --service-directory service \
-        --port $LAS2PEER_PORT \
-        $([ -n "$LAS2PEER_BOOTSTRAP" ] && echo "--bootstrap $LAS2PEER_BOOTSTRAP") \
-        --node-id-seed $NODE_ID_SEED \
-        $(echo $ADDITIONAL_LAUNCHER_ARGS) \
-        startWebConnector
-    fi
+    # if [ -n "$LAS2PEER_ETH_HOST" ]; then
+    # echo ... using ethereum boot procedure: 
+    # java $(echo $ADDITIONAL_JAVA_ARGS) \
+    #     -cp "lib/*" i5.las2peer.tools.L2pNodeLauncher \
+    #     --service-directory service \
+    #     --port $LAS2PEER_PORT \
+    #     $([ -n "$LAS2PEER_BOOTSTRAP" ] && echo "--bootstrap $LAS2PEER_BOOTSTRAP") \
+    #     --node-id-seed $NODE_ID_SEED \
+    #     --ethereum-mnemonic "$(selectMnemonic)" \
+    #     $(echo $ADDITIONAL_LAUNCHER_ARGS) \
+    #     uploadStartupDirectory \
+	# 	startService\("'""${SERVICE}""'", "'""${SERVICE_PASSPHRASE}""'"\) \
+	# 	startWebConnector \
+    #     "node=getNodeAsEthereumNode()" "registry=node.getRegistryClient()" "n=getNodeAsEthereumNode()" "r=n.getRegistryClient()"
+    # else
+    #  echo ... using non-ethereum boot procedure:
+    # java $(echo $ADDITIONAL_JAVA_ARGS) \
+    #     -cp "lib/*" i5.las2peer.tools.L2pNodeLauncher \
+    #     --service-directory service \
+    #     --port $LAS2PEER_PORT \
+    #     $([ -n "$LAS2PEER_BOOTSTRAP" ] && echo "--bootstrap $LAS2PEER_BOOTSTRAP") \
+    #     --node-id-seed $NODE_ID_SEED \
+    #     $(echo $ADDITIONAL_LAUNCHER_ARGS) \
+    #     startWebConnector
+    # fi
+    exec ${LAUNCH_COMMAND} startService\("'""${SERVICE}""'", "'""${SERVICE_PASSPHRASE}""'"\) startWebConnector
 else
   exec ${LAUNCH_COMMAND} ${@}
 fi
