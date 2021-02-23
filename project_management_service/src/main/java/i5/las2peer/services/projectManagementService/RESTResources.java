@@ -380,10 +380,6 @@ public class RESTResources {
 			    	boolean added = project.addUser(user, connection, true); // true, because user also should be added to users list of Project object
 		    	    if(added) {
 		    	        // return result: ok
-		    	    	// user object should be returned
-		    	    	// also the assigned role should be included
-		    	    	JSONObject o = user.toJSONObject();
-		    	    	o.put("roleId", project.getRoleByUser(user).getId());
 		    	    	
 		    	    	// remove invitation
 		    	    	ProjectInvitation.delete(projectId, user.getId(), connection);
@@ -1688,7 +1684,7 @@ public class RESTResources {
 				user = authManager.getUser();
 				
 				// returns user as json string
-	            return Response.ok(user.toJSONObject().toJSONString()).build();
+	            return Response.ok(user.toJSONObject(true).toJSONString()).build();
 			} catch (SQLException e) {
 				logger.printStackTrace(e);
 				// return server error at the end

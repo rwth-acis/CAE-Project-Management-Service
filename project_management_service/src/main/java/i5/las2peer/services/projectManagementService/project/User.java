@@ -204,18 +204,21 @@ public class User {
 	
 	/**
 	 * Creates a JSON object from the user object.
+	 * @param all Whether all information of the user is required, or e.g. email can be omitted.
 	 * @return JSONObject containing the user information.
 	 */
 	@SuppressWarnings("unchecked")
-	public JSONObject toJSONObject() {
+	public JSONObject toJSONObject(boolean all) {
 		JSONObject jsonUser = new JSONObject();
 		
 		// put attributes
 		jsonUser.put("id", this.id);
 		jsonUser.put("loginName", this.loginName);
-		jsonUser.put("email", this.email);
 		jsonUser.put("gitHubUsername", this.gitHubUsername);
-		jsonUser.put("gitHubAccessToken", this.gitHubAccessToken);
+		if(all) {
+		    jsonUser.put("email", this.email);
+		    jsonUser.put("gitHubAccessToken", this.gitHubAccessToken);
+		}
 
 		return jsonUser;
 	}
