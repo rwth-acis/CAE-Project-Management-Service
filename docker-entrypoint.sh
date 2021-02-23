@@ -201,6 +201,7 @@ echo external_address = $(curl -s https://ipinfo.io/ip):${LAS2PEER_PORT} > etc/p
 # start the service within a las2peer node
 if [[ -z "${@}" ]]
 then
+  exec ${LAUNCH_COMMAND} startService\("'""${SERVICE}""'", "'""${SERVICE_PASSPHRASE}""'"\) startWebConnector
     # if [ -n "$LAS2PEER_ETH_HOST" ]; then
     # echo ... using ethereum boot procedure: 
     # java $(echo $ADDITIONAL_JAVA_ARGS) \
@@ -226,7 +227,6 @@ then
     #     $(echo $ADDITIONAL_LAUNCHER_ARGS) \
     #     startWebConnector
     # fi
-    exec ${LAUNCH_COMMAND} startService\("'""${SERVICE}""'", "'""${SERVICE_PASSPHRASE}""'"\) startWebConnector
 else
   exec ${LAUNCH_COMMAND} ${@}
 fi
