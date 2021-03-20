@@ -133,6 +133,7 @@ public class RESTResources {
 			    		// persist method also stores users of the project (only the creator for now) etc.
 				    	project.persist(connection, accessToken);
 				    	
+						project.saveGroup(connection, inputProject, accessToken);
 				    	// if user has stored a GitHub username, then grant access to the GitHub project
 				    	if(user.getGitHubUsername() != null) {
 				    	    GitHubHelper.getInstance().grantUserAccessToProject(user.getGitHubUsername(), project.getGitHubProject());
@@ -430,7 +431,7 @@ public class RESTResources {
 	 * @param userId Id of the user to remove from the project.
 	 * @return Response with status code (and possibly an error description).
 	 */
-	@DELETE
+	@POST
 	@Path("/projects/{projectId}/users/{userId}")
 	@ApiOperation(value = "Removes a user from the project.")
 	@ApiResponses(value = {
@@ -440,7 +441,7 @@ public class RESTResources {
 			@ApiResponse(code = HttpURLConnection.HTTP_NOT_FOUND, message = "Project with the given id or user to remove from project could not be found or user to remove is no member of the project."),
 			@ApiResponse(code = HttpURLConnection.HTTP_INTERNAL_ERROR, message = "Internal server error.")
 	})
-	public Response removeUserFromProject(@PathParam("projectId") int projectId, @PathParam("userId") int userId) {
+	public Response removeUserFromProject(@PathParam("projectId") int projectId, @PathParam("userId") int userId, String body) {
 		Context.get().monitorEvent(MonitoringEvent.SERVICE_MESSAGE, "removeUserFromProject: removing user with id " + userId + " from project with id " + projectId);
 		
 		if(authManager.isAnonymous()) {
@@ -462,6 +463,7 @@ public class RESTResources {
 		    	    boolean removed = project.removeUser(userId, connection);
 		    	    if(removed) {
 		    	        // return result: ok
+						project.updateGroup(body, userId);
 		    	        return Response.ok().build();
 		    	    } else {
 		    	    	// user is no member of the project
@@ -1396,7 +1398,7 @@ public class RESTResources {
 			    	    // create invitation
 			    	    ProjectInvitation inv = new ProjectInvitation(projectId, userToInvite.getId());
 			    	    inv.persist(connection);
-			    	    
+						project.updateGroup(inputUser, -1);
 			    	    return Response.ok().build();
 			    	} else {
 			    		return Response.status(HttpURLConnection.HTTP_BAD_REQUEST)

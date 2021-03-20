@@ -1,5 +1,10 @@
 package i5.las2peer.services.projectManagementService.project;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -8,6 +13,9 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
+
+import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -171,7 +179,6 @@ public class Project {
 		this.name = queryResult.getString("name");
 		this.gitHubProject = new GitHubProject(queryResult.getInt("gitHubProjectId"),
 				queryResult.getString("gitHubProjectHtmlUrl"));
-
 		// load roles
 		loadRoles(connection);
 
@@ -419,6 +426,117 @@ public class Project {
 		} finally {
 			// reset auto commit to previous value
 			connection.setAutoCommit(autoCommitBefore);
+		}
+	}
+
+	public void saveGroup(Connection connection, String body, String accessToken) throws SQLException {
+		// call las2peer to save group
+		String url = "http://host.docker.internal:8012/las2peer/agents/createGroupJSON";
+		JSONObject json = (JSONObject) JSONValue.parse(body);
+		String USER_AGENT = "Mozilla/5.0";
+		URL obj = null;
+		HttpURLConnection httpCon = null;
+		JSONObject newJson = new JSONObject();
+		newJson.put("name", this.getProjectNameToLowerCaseAndBinded());
+		JSONArray membersArray = new JSONArray();
+		for (User user : this.users) {
+			JSONObject memberObject = new JSONObject();
+			memberObject.put("agentid", user.getLoginName());
+			membersArray.add(memberObject);
+		}
+		newJson.put("members", membersArray);
+		try {
+			obj = new URL(url);
+			httpCon = (HttpURLConnection) obj.openConnection();
+			httpCon.setRequestMethod("POST");
+			httpCon.setRequestProperty("User-Agent", USER_AGENT);
+			httpCon.setDoOutput(true);
+			httpCon.setDoInput(true);
+			httpCon.setRequestProperty("Authorization", "Basic " + json.get("Authorization"));
+			httpCon.setRequestProperty("Content-Type", "application/json");
+			httpCon.setRequestProperty("Content-Length", String.valueOf(newJson.toString().length()));
+			httpCon.setConnectTimeout(50000000);
+			OutputStreamWriter writer = new OutputStreamWriter(httpCon.getOutputStream());
+			writer.write(newJson.toString());
+			writer.flush();
+			writer.close();
+			httpCon.getResponseCode();
+			String response = "";
+			BufferedReader reader = new BufferedReader(new InputStreamReader(httpCon.getInputStream()));
+			for (String line; (line = reader.readLine()) != null;) {
+				response += line;
+			}
+			reader.close();
+			JSONObject jsonResponse = (JSONObject) JSONValue.parse(response);
+			if (!jsonResponse.get("code").toString().equals("200")) {
+				System.out.println("Deleting project");
+				this.delete(connection, accessToken);
+				throw new Error("Error saving group");
+			}
+		} catch (Exception e) {
+			try {
+				this.delete(connection, accessToken);
+			} catch (Exception f) {
+				System.out.println("Error reversing project creation");
+			}
+			System.out.println("Error saving group");
+			System.out.println(e);
+		}
+	}
+
+	public void updateGroup(String body, int userId) throws SQLException {
+		// call las2peer to save group
+		String url = "http://host.docker.internal:8012/las2peer/agents/changeGroupJSON";
+		JSONObject json = (JSONObject) JSONValue.parse(body);
+		String USER_AGENT = "Mozilla/5.0";
+		URL obj = null;
+		HttpURLConnection httpCon = null;
+		JSONObject newJson = new JSONObject();
+		newJson.put("agentid", this.getProjectNameToLowerCaseAndBinded());
+		JSONArray membersArray = new JSONArray();
+		for (User user : this.users) {
+			if (userId != user.getId()) {
+				JSONObject memberObject = new JSONObject();
+				memberObject.put("agentid", user.getLoginName());
+				membersArray.add(memberObject);
+			}
+		}
+		if (String.valueOf(userId).equals("-1")) {
+			JSONObject memberObject = new JSONObject();
+			String userToInviteLoginName = (String) json.get("loginName");
+			memberObject.put("agentid", userToInviteLoginName);
+			membersArray.add(memberObject);
+		}
+		newJson.put("members", membersArray);
+		try {
+			obj = new URL(url);
+			httpCon = (HttpURLConnection) obj.openConnection();
+			httpCon.setRequestMethod("POST");
+			httpCon.setRequestProperty("User-Agent", USER_AGENT);
+			httpCon.setDoOutput(true);
+			httpCon.setDoInput(true);
+			httpCon.setRequestProperty("Authorization", "Basic " + json.get("Authorization"));
+			httpCon.setRequestProperty("Content-Type", "application/json");
+			httpCon.setRequestProperty("Content-Length", String.valueOf(newJson.toString().length()));
+			httpCon.setConnectTimeout(50000000);
+			OutputStreamWriter writer = new OutputStreamWriter(httpCon.getOutputStream());
+			writer.write(newJson.toString());
+			writer.flush();
+			writer.close();
+			httpCon.getResponseCode();
+			String response = "";
+			BufferedReader reader = new BufferedReader(new InputStreamReader(httpCon.getInputStream()));
+			for (String line; (line = reader.readLine()) != null;) {
+				response += line;
+			}
+			reader.close();
+			JSONObject jsonResponse = (JSONObject) JSONValue.parse(response);
+			if (!jsonResponse.get("code").toString().equals("200")) {
+				throw new Error("Error updating group");
+			}
+		} catch (Exception e) {
+			System.out.println("Error updating group");
+			System.out.println(e);
 		}
 	}
 
@@ -1130,5 +1248,17 @@ public class Project {
 				return role;
 		}
 		throw new NoDefaultRoleFoundException();
+	}
+
+	private String getProjectNameToLowerCaseAndBinded() {
+		String[] projectWords = this.name.split("\\s+");
+		String formatedName = "";
+		for (int i = 0; i < projectWords.length; i++) {
+			formatedName = formatedName + projectWords[i] + "-";
+		}
+		if (formatedName != null && formatedName.length() > 0) {
+			formatedName = formatedName.substring(0, formatedName.length() - 1);
+		}
+		return formatedName.toLowerCase();
 	}
 }
