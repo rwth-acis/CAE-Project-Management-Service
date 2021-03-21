@@ -42,6 +42,8 @@ export MYSQL_DATABASE='commedit'
     echo "Mandatory variable GITHUB_OAUTH_CLIENTSECRET is not set. Add -e GITHUB_OAUTH_CLIENTSECRET=client_secret to your arguments." && exit 1
 [[ -z "${REQ_BAZ_PROJECT_ID}" ]] && \
     echo "Mandatory variable REQ_BAZ_PROJECT_ID is not set. Add -e REQ_BAZ_PROJECT_ID=project_id to your arguments." && exit 1
+[[ -z "${LAS2PEER_URL}" ]] && \
+    echo "Mandatory variable LAS2PEER_URL is not set. Add -e LAS2PEER_URL=url to your arguments." && exit 1
 
 # set defaults for optional service parameters
 [[ -z "${SERVICE_PASSPHRASE}" ]] && export SERVICE_PASSPHRASE='Passphrase'
@@ -74,6 +76,7 @@ set_in_service_config debugDisableCategoryCreation ${DISABLE_CATEGORY_CREATION}
 set_in_service_config gitHubOAuthClientId ${GITHUB_OAUTH_CLIENTID}
 set_in_service_config gitHubOAuthClientSecret ${GITHUB_OAUTH_CLIENTSECRET}
 set_in_service_config reqBazProjectId ${REQ_BAZ_PROJECT_ID}
+set_in_service_config las2peerUrl ${LAS2PEER_URL}
 
 # configure web connector properties
 

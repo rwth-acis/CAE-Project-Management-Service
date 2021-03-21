@@ -21,6 +21,7 @@ import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
 
+import i5.las2peer.services.projectManagementService.ProjectManagementService;
 import i5.las2peer.services.projectManagementService.component.Component;
 import i5.las2peer.services.projectManagementService.component.ComponentType;
 import i5.las2peer.services.projectManagementService.component.Dependency;
@@ -33,13 +34,14 @@ import i5.las2peer.services.projectManagementService.exception.RoleNotFoundExcep
 import i5.las2peer.services.projectManagementService.github.GitHubHelper;
 import i5.las2peer.services.projectManagementService.github.GitHubProject;
 
+import i5.las2peer.api.Context;
 /**
  * (Data-)Class for Projects. Provides means to convert JSON to Object and
  * Object to JSON. Also provides means to persist the object to a database.
  * TODO: check if this javadoc is still correct later
  */
 public class Project {
-
+	private final ProjectManagementService service = (ProjectManagementService) Context.getCurrent().getService();
 	/**
 	 * Id of the project. Initially set to -1 if project is not persisted yet.
 	 */
@@ -431,7 +433,8 @@ public class Project {
 
 	public void saveGroup(Connection connection, String body, String accessToken) throws SQLException {
 		// call las2peer to save group
-		String url = "http://host.docker.internal:8012/las2peer/agents/createGroupJSON";
+		String las2peerUrl = this.service.getLas2peerUrl();
+		String url = las2peerUrl + "/las2peer/agents/createGroupJSON";
 		JSONObject json = (JSONObject) JSONValue.parse(body);
 		String USER_AGENT = "Mozilla/5.0";
 		URL obj = null;
@@ -470,7 +473,6 @@ public class Project {
 			JSONObject jsonResponse = (JSONObject) JSONValue.parse(response);
 			if (!jsonResponse.get("code").toString().equals("200")) {
 				System.out.println("Deleting project");
-				this.delete(connection, accessToken);
 				throw new Error("Error saving group");
 			}
 		} catch (Exception e) {
@@ -486,7 +488,8 @@ public class Project {
 
 	public void updateGroup(String body, int userId) throws SQLException {
 		// call las2peer to save group
-		String url = "http://host.docker.internal:8012/las2peer/agents/changeGroupJSON";
+		String las2peerUrl = this.service.getLas2peerUrl();
+		String url = las2peerUrl + "/las2peer/agents/changeGroupJSON";
 		JSONObject json = (JSONObject) JSONValue.parse(body);
 		String USER_AGENT = "Mozilla/5.0";
 		URL obj = null;

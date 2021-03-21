@@ -56,7 +56,9 @@ public class ProjectManagementService extends RESTService {
 	private int reqBazProjectId;
 	// debug variable to turn on/off the creation of requirements bazaar categories
 	private boolean debugDisableCategoryCreation;
-	
+
+	private String las2peerUrl;
+
 	public ProjectManagementService() {
 		// read and set properties values
 		setFieldValues();
@@ -156,5 +158,9 @@ public class ProjectManagementService extends RESTService {
 		} catch (Exception e) {
 			return false;
 		}
+	}
+
+	public String getLas2peerUrl(){
+		return this.las2peerUrl;
 	}
 }
