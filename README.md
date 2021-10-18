@@ -59,7 +59,7 @@ The las2peer port is fixed at *9011*.
 | GITHUB_OAUTH_CLIENTID | *mandatory* |
 | GITHUB_OAUTH_CLIENTSECRET | *mandatory* |
 | REQ_BAZ_PROJECT_ID | *mandatory* |
-| DISABLE_CATEGORY_CREATION | false |
+| DISABLE_CATEGORY_CREATION | true |
 
 ### Web Connector Variables
 
